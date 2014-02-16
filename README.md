@@ -1,17 +1,22 @@
 The NeoPixel Server
 ===================
 
+## Summary
 This is the source code for an Arduino project for a very small and bare webserver, controlling
 a strip or ring of WS2812 LEDs with an integrated driver.
 
-The hardware consists of a mircocontroller (tested with Arduino Leonardo and Sparkfun Fio v3),
-a strip or ring of WS2812 LEDs (Adafruit NeoPixel, if you want to call them that) and an Adafruit
-CC3000 breakout or Arduino Shield. It also kind of supports spectrum analysis using an electrit
-microphone, connected to an analog input, but that particular feature is only working on the
-Sparkfun Fio v3 on A4 at the moment, as that was done in a trial and error fasion during an 8h
-drive.
+## Hardware
+* An Arduino-Compatible microcontroller with at least 28kB of flash available for user code and 2kB of RAM. Arduino Leonardo and Sparkfun Fio v3 are tested and working.
+* A strip or ring of WS2812 LEDs (Adafruit NeoPixels, if you will).
+* The CC3000 breakout board or shield from Adafruit.
+* The MAX4466 breakout board from Adafruit, if you want to test the as of yet flimsy and broken spectrum analyzer.
 
-To build this project, the following libraries are required:
+## Known Issues
+* The spectrum analyzer code only works on Sparkfun Fio v3 with the microphone connected to A4, as that was done in a trial and error fasion during an 8h
+drive.
+* If too many requests are received in a short period of time, the server tends to crash because of memory limitations.
+
+## Build Requirements
 * Adafruit CC3000 Library: https://github.com/adafruit/Adafruit_CC3000_Library
 * Adafruit NeoPixel Library: https://github.com/adafruit/Adafruit_NeoPixel
 * Fast Hartley Transform library: http://wiki.openmusiclabs.com/wiki/ArduinoFHT
@@ -23,3 +28,28 @@ onto a microcontroller with only 32k flash, use these libraries:
   - In "utility/cc3000_common.h": define CC3000_TINY_DRIVER, CC3000_TINY_SERVER, CC3000_STANDARD_BUFFER_SIZE, CC3000_SECURE and CC3000_NO_PATCH. Then comment out CC3000_MESSAGES_VERBOSE
 * Custom Adafruit NeoPixel Library: https://github.com/ranthor/Adafruit_NeoPixel
   - In "Adafruit_NeoPixel.h": define NEOPIXEL_TINY_DRIVER
+
+## License
+Copyright (c) 2013, Paul Schulze
+
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice,
+  this list of conditions and the following disclaimer.
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+OF SUCH DAMAGE.
