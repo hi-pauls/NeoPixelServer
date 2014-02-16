@@ -30,7 +30,7 @@ onto a microcontroller with only 32k flash, use these libraries:
   - In "Adafruit_NeoPixel.h": define NEOPIXEL_TINY_DRIVER
 
 ## License
-Copyright (c) 2013, Paul Schulze
+Copyright (c) 2014, Paul Schulze
 
 All rights reserved.
 
