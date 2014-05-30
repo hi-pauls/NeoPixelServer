@@ -3,7 +3,7 @@ The NeoPixel Server
 
 ## Summary
 This is the source code for an Arduino project for a very small and bare webserver, controlling
-a strip or ring of WS2812 LEDs with an integrated driver.
+a strip or ring of WS2812 LEDs with an integrated driver. For information on the build, check out project page: http://www.helgames.com/content/neopixel-server-arduino-c
 
 ## Hardware
 * An Arduino-Compatible microcontroller with at least 28kB of flash available for user code and 2kB of RAM. Arduino Leonardo and Sparkfun Fio v3 are tested and working.
