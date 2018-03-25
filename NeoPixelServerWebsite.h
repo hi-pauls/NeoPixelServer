@@ -31,7 +31,7 @@ Cache-Control: no-store, no-cache, must-revalidate\n\
 Pragma: no-cache\n\
 Connection: close\n\
 Content-Type: text/html\n\
-Content-Length: 936\n";
+Content-Length: 856\n";
 #else
 "HTTP/1.0 200 OK\n\
 Server: arduino\n\
@@ -44,90 +44,109 @@ Content-Type: text/html\n\n";
 const char PROGMEM website_doctype_data[] =
 #ifdef WEBSITE_SHORT
 "";
-#define WEBSITE_DOCTYPE_LENGTH   0
+#define WEBSITE_DOCTYPE_LENGTH   (0)
 #else
 "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\">";
-#define WEBSITE_DOCTYPE_LENGTH   50
+#define WEBSITE_DOCTYPE_LENGTH   (50)
 #endif
 
 const char PROGMEM website_header_data[] =
 #if defined(WEBSITE_NONE)
 "<html/>";
+#define WEBSITE_HEADER_LENGTH (7)
 #elif defined(WEBSITE_SHORT)
 "<html>\
 <head/>\
 <body>";
-#define WEBSITE_HEADER_LENGTH    19
+#define WEBSITE_HEADER_LENGTH    (6 + 7 + 6)
 #else
 "<html>\
 <head>\
 <title>Lights</title>\
-<meta name='viewport' content='width=320, maximum-scale=1.0, minimum-scale=1.0, user-scalable=false'/>\
+<meta name='viewport' content='width=320,maximum-scale=1.0,minimum-scale=1.0,user-scalable=false'/>\
+<style>\
+div{width:20em;margin:auto;}\
+a,p,h3{text-align:center;font-size:2em;display:block}\
+a:focus,a:hover,a:visited,a:link{font-style:normal;font-weight:bold;text-decoration:none;margin:5px;padding:5px;background:#666;color:#FFF;}\
+</style>\
 </head>\
 <body>";
-#define WEBSITE_HEADER_LENGTH    148
+#define WEBSITE_HEADER_LENGTH    (6 + 6 + 21 + 99 + 7 + 28 + 53 + 140 + 8 + 7 + 6)
 #endif
 
 const char PROGMEM website_options_data[] =
 #ifdef WEBSITE_SHORT
-"<p>\
+"<div>\
+<p>\
 Brightness: ";
-#define WEBSITE_OPTIONS_LENGTH   16
+#define WEBSITE_OPTIONS_LENGTH   (5 + 3 + 12)
 #else
-"<h3>Light:</h3>\
-<p>\
-<a href='c0'>Off</a><br/>\
-<a href='c16777050'>Light</a><br/>\
-<a href='c16777215'>White</a><br/>\
-<a href='c16711680'>Red</a><br/>\
-<a href='c65280'>Green</a><br/>\
-<a href='c255'>Blue</a><br/>\
-<a href='fd'>Fade</a><br/>\
-<a href='rb'>Rainbow</a><br/>\
-<a href='fw'>Fireworks</a><br/>\
-<a href='rn'>Run</a><br/>\
-<a href='cy'>Cylon</a><br/>\
-<a href='cn'>Candle</a><br/>\
-<a href='sp'>Spectrum</a><br/>\
-<br/>\
+"<div>\
+<h3>Mode</h3>\
+<a href='c0'>Off</a>\
+<a href='cFFFF5a'>On</a>\
+<a href='cFFFFFF'>White</a>\
+<a href='cFF0000'>Red</a>\
+<a href='cFF00'>Green</a>\
+<a href='cFF'>Blue</a>\
+<a href='fd'>Fade</a>\
+<a href='rb'>Rainbow</a>\
+<a href='cn'>Candle</a>\
+<a href='fw'>Fireworks</a>\
+<a href='rn'>Run</a>\
+<a href='cy'>Cylon</a>\
+<a href='sp'>Spectrum</a>\
 <a href='st'>Stop</a>\
-</p>\
-<hr/>\
-<h3>Brightness:</h3>\
-<p>\
-<a href='b32'>32</a><br/>\
-<a href='b64'>64</a><br/>\
-<a href='b96'>96</a><br/>\
-<a href='b128'>128</a><br/>\
-<a href='b160'>160</a><br/>\
-<a href='b192'>192</a><br/>\
-<a href='b224'>224</a><br/>\
+<h3>Brightness</h3>\
+<a href='b8'>8</a>\
+<a href='b32'>32</a>\
+<a href='b128'>128</a>\
+<a href='b192'>160</a>\
+<a href='b192'>192</a>\
 <a href='b255'>255</a>\
-</p>\
-<hr/>\
 <p>\
 Brightness: ";
-#define WEBSITE_OPTIONS_LENGTH   675
+#define WEBSITE_OPTIONS_LENGTH   (5 + 13 + 20 + 24 + 27 + 25 + 25 + 22 + 21 + 24 + 26 + 20 + 22 + 23 + 25 + 21 + 19 + 18 + 20 + 24 + 24 + 24 + 24 + 3 + 12)
 #endif
 
 const char PROGMEM website_color_data[] =
-  "<br/>Color: #";
+"<br/>Color: #";
 #define WEBSITE_COLOR_LENGTH   13
 
+const char PROGMEM website_version_data[] =
+"<br/>Version: ";
+#define WEBSITE_VERSION_LENGTH   14
+
+const char PROGMEM website_reboot_data[] =
+"<br/>Reboots: ";
+#define WEBSITE_REBOOT_LENGTH   14
+
+const char PROGMEM website_disconnect_data[] =
+"<br/>Disconnect: ";
+#define WEBSITE_DISCONNECT_LENGTH   17
+
+const char PROGMEM website_prevState_data[] =
+"<br/>Prev State: ";
+#define WEBSITE_PREVSTATE_LENGTH   17
+
 const char PROGMEM website_command_data[] =
-  "<br/>Command: ";
-#define WEBSITE_COMMAND_LENGTH   14
+"<br/>Command: ";
+#define WEBSITE_COMMAND_LENGTH   15
 
 const char PROGMEM website_footer_data[] =
 "</p>\
+</div>\
 </body>\
 </html>";
-#define WEBSITE_FOOTER_LENGTH    18
-#define WEBSITE_BASE_LENGTH      (WEBSITE_DOCTYPE_LENGTH + \
-                                 WEBSITE_HEADER_LENGTH +   \
-                                 WEBSITE_OPTIONS_LENGTH +  \
-                                 WEBSITE_COLOR_LENGTH +    \
-                                 WEBSITE_COMMAND_LENGTH +  \
+#define WEBSITE_FOOTER_LENGTH    (4 + 6 + 7 + 7)
+#define WEBSITE_BASE_LENGTH      (WEBSITE_DOCTYPE_LENGTH +   \
+                                 WEBSITE_HEADER_LENGTH +     \
+                                 WEBSITE_OPTIONS_LENGTH +    \
+                                 WEBSITE_COLOR_LENGTH +      \
+                                 WEBSITE_VERSION_LENGTH +    \
+                                 WEBSITE_REBOOT_LENGTH +     \
+                                 WEBSITE_PREVSTATE_LENGTH +  \
+                                 WEBSITE_COMMAND_LENGTH +    \
                                  WEBSITE_FOOTER_LENGTH)
-#define WEBSITE_VARIABLE_LENGTH  18
+#define WEBSITE_VARIABLE_LENGTH  26
 #endif
