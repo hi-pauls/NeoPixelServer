@@ -384,7 +384,7 @@ void setup()
     // Enable the watchdog timer
     wdt_reset();
     wdt_enable(WDTO_8S);
-    delay(1000);
+    delay(4000);
     wdt_reset();
 
 #ifndef NO_SERIAL
