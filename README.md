@@ -24,9 +24,9 @@ Using the default libraries may result in a binary, that does not fit onto your 
 likely end up with a project, that is 31k or more in binary size. If you want to fit the project
 onto a microcontroller with only 32k flash, use these libraries:
 * Forked Adafruit CC3000 Library: https://github.com/helgames/Adafruit_CC3000_Library
-  - In "utility/cc3000_common.h": define CC3000_TINY_DRIVER, CC3000_TINY_SERVER, CC3000_TINY_EXPERIMENTAL, CC3000_STANDARD_BUFFER_SIZE, CC3000_SECURE and CC3000_NO_PATCH. Then comment out CC3000_MESSAGES_VERBOSE and CC3000_DHCP_INFO
+** In "utility/cc3000_common.h": define CC3000_TINY_DRIVER, CC3000_TINY_SERVER, CC3000_TINY_EXPERIMENTAL, CC3000_STANDARD_BUFFER_SIZE, CC3000_SECURE and CC3000_NO_PATCH. Then comment out CC3000_MESSAGES_VERBOSE and CC3000_DHCP_INFO
 * Forked Adafruit NeoPixel Library: https://github.com/helgames/Adafruit_NeoPixel
-  - In "Adafruit_NeoPixel.h": define NEOPIXEL_TINY_DRIVER
+** In "Adafruit_NeoPixel.h": define NEOPIXEL_TINY_DRIVER
 
 ## License
 Copyright (c) 2014, Paul Schulze
