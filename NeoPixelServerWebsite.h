@@ -42,7 +42,7 @@ Content-Type: text/html\n\n";
 #endif
 
 const char PROGMEM website_doctype_data[] =
-#ifdef WEBSITE_SHORT
+#if defined(WEBSITE_NONE) || defined(WEBSITE_SHORT)
 "";
 #define WEBSITE_DOCTYPE_LENGTH   (0)
 #else
@@ -75,7 +75,10 @@ a:focus,a:hover,a:visited,a:link{font-style:normal;font-weight:bold;text-decorat
 #endif
 
 const char PROGMEM website_options_data[] =
-#ifdef WEBSITE_SHORT
+#if defined(WEBSITE_NONE)
+"";
+#define WEBSITE_OPTIONS_LENGTH   (0)
+#elif defined(WEBSITE_SHORT)
 "<div>\
 <p>\
 Brightness: ";
@@ -110,35 +113,70 @@ Brightness: ";
 #endif
 
 const char PROGMEM website_color_data[] =
+#ifdef WEBSITE_NONE
+"";
+#define WEBSITE_COLOR_LENGTH   0
+#else
 "<br/>Color: #";
 #define WEBSITE_COLOR_LENGTH   13
+#endif
 
 const char PROGMEM website_version_data[] =
+#ifdef WEBSITE_NONE
+"";
+#define WEBSITE_VERSION_LENGTH   0
+#else
 "<br/>Version: ";
 #define WEBSITE_VERSION_LENGTH   14
+#endif
 
 const char PROGMEM website_reboot_data[] =
+#ifdef WEBSITE_NONE
+"";
+#define WEBSITE_REBOOT_LENGTH   0
+#else
 "<br/>Reboots: ";
 #define WEBSITE_REBOOT_LENGTH   14
+#endif
 
 const char PROGMEM website_disconnect_data[] =
+#ifdef WEBSITE_NONE
+"";
+#define WEBSITE_DISCONNECT_LENGTH   0
+#else
 "<br/>Disconnect: ";
 #define WEBSITE_DISCONNECT_LENGTH   17
+#endif
 
 const char PROGMEM website_prevState_data[] =
+#ifdef WEBSITE_NONE
+"";
+#define WEBSITE_PREVSTATE_LENGTH   0
+#else
 "<br/>Prev State: ";
 #define WEBSITE_PREVSTATE_LENGTH   17
+#endif
 
 const char PROGMEM website_command_data[] =
+#ifdef WEBSITE_NONE
+"";
+#define WEBSITE_COMMAND_LENGTH   0
+#else
 "<br/>Command: ";
 #define WEBSITE_COMMAND_LENGTH   15
+#endif
 
 const char PROGMEM website_footer_data[] =
+#ifdef WEBSITE_NONE
+"";
+#define WEBSITE_FOOTER_LENGTH    0
+#else
 "</p>\
 </div>\
 </body>\
 </html>";
 #define WEBSITE_FOOTER_LENGTH    (4 + 6 + 7 + 7)
+#endif
 #define WEBSITE_BASE_LENGTH      (WEBSITE_DOCTYPE_LENGTH +   \
                                  WEBSITE_HEADER_LENGTH +     \
                                  WEBSITE_OPTIONS_LENGTH +    \
