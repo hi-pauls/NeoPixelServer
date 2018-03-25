@@ -1,3 +1,4 @@
+#include <avr/wdt.h>
 #include <SPI.h>
 #include "Adafruit_NeoPixel.h"
 #include "NeoPixelServerConfig.h"
@@ -5,37 +6,47 @@
 #include "Adafruit_CC3000.h"
 #include "Adafruit_CC3000_Server.h"
 
-// Save about 600kB of flash
-#define NO_SERIAL
+#define VERSION '7'
+int32_t rebootCount __attribute__ ((section (".noinit")));
+int32_t disconnectCount __attribute__ ((section (".noinit")));
+char debugStage __attribute__ ((section (".noinit")));
+char prevDebugStage = '0';
+
+// Save about 600B of flash
 #ifdef NO_SERIAL
     #define SERIAL_PRINTLN(content)
+    #define DEBUG_PRINTLN(content)   debugStage = content
 #else
     #define SERIAL_PRINTLN(content)  Serial.println(content);
+    #define DEBUG_PRINTLN(content)   { debugStage = content; Serial.println(content); }
 #endif
 
 // Save about 5.2kB of flash
-//#define NO_EFFECTS
 #ifdef NO_EFFECTS
-    #define NO_CANDLE
+    // Can also be defined separately
+    #define NO_FADE
+    #define NO_RAINBOW
+    #define NO_FLICKER
+    #define NO_FIREWORKS
+    #define NO_RUN
+    #define NO_CYLON
     #define NO_SPECTRUM
+#endif
 
+#ifdef NO_CYLON
     #define ERROR()  colorWipe()
 #else
     #define ERROR()  cylon()
 #endif
 
-// Save about 100B of flash
-//#define NO_CANDLE
-
 // Save about 2.7kB of flash
-#define NO_SPECTRUM
 #ifdef NO_SPECTRUM
     #define FIX_BRIGHTNESS()
 #else
     #include "FHT.h"
 
     #define MIC_PIN A5
-    #define FIX_BRIGHTNESS()  setBrightness(brightness)
+    #define FIX_BRIGHTNESS()  setBrightness(settings.getBrightness())
 #endif
 
 // NeoPixel Strip setup
@@ -43,7 +54,8 @@
 #define NEOPIXEL_COLOR_DELAY    40
 #define NEOPIXEL_RAINBOW_DELAY  20
 #define NEOPIXEL_FLICKER_DELAY  100
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(NEOPIXEL_COUNT, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
+uint8_t pixels[NEOPIXEL_COUNT * 3] __attribute__ ((section (".noinit")));
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(NEOPIXEL_COUNT, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800, pixels);
 
 // Wifi adapter setup
 #define CC3000_IRQ   3
@@ -61,6 +73,12 @@ Adafruit_CC3000_Server webServer(WEBSERVER_PORT);
     #define PRINT_CONTENT(content)  client.fastrprint(content)
 #endif
 
+#ifndef NOINLINE
+    #define NOINLINE __attribute__ ((noinline))
+#endif
+
+#define nps_strcmp(lhs, rhs) strcmp(lhs, rhs)
+
 #define STATE_NONE          0
 #define STATE_COLOR_CHANGE  1
 #define STATE_COLOR_FADE    2
@@ -71,33 +89,149 @@ Adafruit_CC3000_Server webServer(WEBSERVER_PORT);
 #define STATE_FLICKER       7
 #define STATE_SPECTRUM      8
 
-// Settings
-uint8_t brightness;
-int32_t color = 0;
-int32_t variance = 0;
-int8_t direction = 1;
+#define SETTINGS_MAGIC         "Nps"
+#define SETTINGS_MAGIC_LENGTH  3
+#define SETTINGS_PROPERTY(type, name, accessor)                                                   \
+    public:                                                                                       \
+        type get ## accessor() const { return name; }                                             \
+        NOINLINE void set ## accessor(type name) { this->name = name; this->updateChecksum(); }   \
+    private:                                                                                      \
+        type name
+
+class Settings
+{
+public:
+    char magic[SETTINGS_MAGIC_LENGTH + 1];
+
+    NOINLINE bool boot()
+    {
+        // Check magic start and checksum
+        bool magicMatch = nps_strcmp(magic, SETTINGS_MAGIC) == 0;
+        if (magicMatch) DEBUG_PRINTLN('I');
+
+        bool csMatch = checksum == calcChecksum();
+        if (csMatch) DEBUG_PRINTLN('J');
+
+        bool versionMatch = VERSION == prevVersion;
+        if (versionMatch) DEBUG_PRINTLN('K');
+
+        if (initializedOnBoot = !(magicMatch && csMatch && versionMatch))
+        {
+            // Different guard begin, not initialized
+            memcpy(magic, SETTINGS_MAGIC, SETTINGS_MAGIC_LENGTH);
+            magic[SETTINGS_MAGIC_LENGTH] = 0;
+            rebootCount = 0;
+            disconnectCount = 0;
+
+            initialized = false;
+            lastChange = 0;
+            state = STATE_NONE;
+
+            brightness = 0;
+            color = 0xFF0000;
+            offset = 0;
+            variance = 0;
+            direction = 1;
+
+    #ifndef NO_SPECTRUM
+            cutoff = 100;
+            sensitivity = 10;
+            frequencyRolloff = 4;
+    #endif
+            prevDebugStage = '0';
+        }
+        else
+        {
+            rebootCount++;
+        }
+
+        prevVersion = VERSION;
+        updateChecksum();
+        return initializedOnBoot;
+    }
+
+    NOINLINE int16_t updateOffset()
+    {
+        offset += direction;
+        updateChecksum();
+        return offset;
+    }
+
+    NOINLINE void updateOffsetWrap(int16_t wrap)
+    {
+        offset = (offset + direction) % wrap;
+        updateChecksum();
+    }
+
+    NOINLINE void invertDirection()
+    {
+        direction = -direction;
+        updateChecksum();
+    }
+
+    NOINLINE bool checkTime(uint32_t timeout)
+    {
+        uint32_t current = millis();
+        if ((current - lastChange) < timeout)
+        {
+            // Wait another receive cycle.
+            return false;
+        }
+
+        setLastChange(current);
+        return true;
+    }
+
+    NOINLINE void initState(uint8_t state)
+    {
+        this->state = state;
+        offset = 0;
+        direction = 1;
+        updateChecksum();
+    }
+
+    bool initializedOnBoot;
+    char prevVersion;
+
+private:
+    NOINLINE uint8_t calcChecksum()
+    {
+        uint8_t checksum = 0;
+        uint8_t size = sizeof(Settings) - 4;
+        uint8_t* dataPtr = (uint8_t*)(this);
+        for (uint8_t i = 0; i < size; ++i, ++dataPtr)
+        {
+            checksum ^= *dataPtr;
+        }
+
+        return checksum;
+    }
+
+    void updateChecksum() { checksum = calcChecksum(); }
+
+    // Settings
+    SETTINGS_PROPERTY(uint8_t, brightness, Brightness);
+    SETTINGS_PROPERTY(int32_t, color, Color);
+    SETTINGS_PROPERTY(int32_t, variance, Variance);
+    SETTINGS_PROPERTY(int8_t, direction, Direction);
 
 #ifndef NO_SPECTRUM
-    uint8_t cutoff = 100;
-    uint8_t sensitivity = 10;
-    uint8_t frequencyRolloff = 4;
+    SETTINGS_PROPERTY(uint8_t, cutoff, Cutoff);
+    SETTINGS_PROPERTY(uint8_t, sensitivity, Sensitivity);
+    SETTINGS_PROPERTY(uint8_t, frequencyRolloff, FrequencyRolloff);
 #endif
 
-// State
-uint8_t state;
-int16_t offset = 0;
-uint32_t lastChange = 0;
+    // State
+    SETTINGS_PROPERTY(bool, initialized, Initialized);
+    SETTINGS_PROPERTY(uint8_t, state, State);
+    SETTINGS_PROPERTY(int16_t, offset, Offset);
+    SETTINGS_PROPERTY(uint32_t, lastChange, LastChange);
 
-void setupError()
-{
-    color = 0xFF0000;
-    offset = 0;
-    while (true)
-    {
-        ERROR();
-        delay(20);
-    }
-}
+    uint8_t checksum;
+};
+
+// Runtime data
+Settings settings __attribute__ ((section (".noinit")));
 
 #ifndef NO_SPECTRUM
 void setupMicrophone()
@@ -133,62 +267,50 @@ void setupMicrophone()
 }
 #endif
 
-void setup()
+void setupErrorReboot(char error)
 {
-    // Initialize the strip.
-    strip.begin();
-    strip.show();
-    setBrightness(NEOPIXEL_BRIGHTNESS);
-
-#ifndef NO_SPECTRUM
-    // Initialize the microphone
-    setupMicrophone();
-#endif
-
-#ifndef NO_SERIAL
-    Serial.begin(115200);
-    //while (! Serial);
-#endif
-
-    if (! cc3000.begin())
+    DEBUG_PRINTLN(error);
+    if (!settings.getInitialized())
     {
-        SERIAL_PRINTLN(F("!50")); // Init
-        setupError();
-    }
+        settings.setColor(0xFF0000);
+        settings.setOffset(0);
+        setBrightness(0xFF);
 
-    if (! cc3000.connectToAP(WLAN_SSID, WLAN_PASS, WLAN_SECURITY))
+        // Reset the watchdog timer a final time before going into the endless loop
+        wdt_reset();
+
+        while (true)
+        {
+            // Don't reset the watchdog timer, just reboot after 8s
+            ERROR();
+            delay(20);
+        }
+    }
+    else
     {
-        SERIAL_PRINTLN(F("!51")); // Associate
-        setupError();
+        delay(1000);
     }
-
-    // Block until DHCP address data is available, or forever, if it isn't.
-    color = 0xFF;
-    offset = 0;
-    while (! cc3000.checkDHCP())
-    {
-        ERROR();
-        delay(20);
-    }
-
-    // Display the IP address DNS, Gateway, etc.
-    while (! displayConnectionDetails())
-    {
-        ERROR();
-        delay(20);
-    }
-
-    // Start listening for connections
-    webServer.begin();
-
-    // Initialize the strip.
-    offset = 0;
-    color = 0xFF00;
-    direction = 1;
-    state = STATE_RUN;
 }
 
-bool displayConnectionDetails(void)
+void setupErrorFrame()
+{
+    if (!settings.getInitialized())
+    {
+        ERROR();
+    }
+
+    wdt_reset();
+    delay(20);
+}
+
+void setupStep()
+{
+    wdt_reset();
+    delay(1000);
+    wdt_reset();
+}
+
+bool displayConnectionDetails()
 {
     uint32_t ipAddress, netmask, gateway, dhcpserv, dnsserv;
 
@@ -197,12 +319,141 @@ bool displayConnectionDetails(void)
         return false;
     }
 
-#ifndef NO_SERIAL
+#if !defined(NO_SERIAL) && !defined(CC3000_TINY_DRIVER)
     cc3000.printIPdotsRev(ipAddress);
     Serial.println();
 #endif
 
     return true;
+}
+
+void setupServer()
+{
+    wdt_reset();
+
+    DEBUG_PRINTLN('T');
+    if (! cc3000.begin())
+    {
+        setupErrorReboot('G'); // Init
+        return;
+    }
+
+    setupStep();
+    DEBUG_PRINTLN('U');
+    if (! cc3000.connectToAP(WLAN_SSID, WLAN_PASS, WLAN_SECURITY))
+    {
+        setupErrorReboot('H'); // Associate
+        return;
+    }
+
+    // Block until DHCP address data is available, or forever, if it isn't.
+    DEBUG_PRINTLN('V');
+    if (!settings.getInitialized())
+    {
+        settings.setColor(0xFF);
+        settings.setOffset(0);
+        setBrightness(NEOPIXEL_BRIGHTNESS);
+    }
+
+    setupStep();
+    DEBUG_PRINTLN('W');
+    while (! cc3000.checkDHCP())
+    {
+        setupErrorFrame();
+    }
+
+    // Display the IP address DNS, Gateway, etc.
+    DEBUG_PRINTLN('X');
+    while (! displayConnectionDetails())
+    {
+        setupErrorFrame();
+    }
+
+    // Start listening for connections
+    setupStep();
+    DEBUG_PRINTLN('Y');
+    webServer.begin();
+    settings.setInitialized(true);
+}
+
+void setup()
+{
+    prevDebugStage = debugStage;
+    debugStage = '0';
+
+    // Enable the watchdog timer
+    wdt_reset();
+    wdt_enable(WDTO_8S);
+    delay(1000);
+    wdt_reset();
+
+#ifndef NO_SERIAL
+    Serial.begin(9600);
+#ifdef SERIAL_WAIT
+    while (! Serial)
+    {
+        wdt_reset();
+        delay(20);
+    }
+#endif
+#endif
+    SERIAL_PRINTLN(VERSION);
+    SERIAL_PRINTLN(prevDebugStage);
+
+    settings.boot();
+
+    // Initialize the strip.
+    strip.begin();
+
+    if (settings.initializedOnBoot)
+    {
+        memset(pixels, 0, NEOPIXEL_COUNT * 3);
+        setBrightness(NEOPIXEL_BRIGHTNESS);
+        strip.show();
+    }
+    else
+    {
+        strip.initBrightness(settings.getBrightness());
+    }
+
+#ifndef NO_SPECTRUM
+    // Initialize the microphone
+    DEBUG_PRINTLN('L');
+    setupMicrophone();
+#endif
+
+    // Reset the watchdog timer
+    DEBUG_PRINTLN('M');
+    setupServer();
+
+    if (settings.initializedOnBoot)
+    {
+        // Initialize the strip.
+        DEBUG_PRINTLN('N');
+
+#ifdef START_ENABLED
+#if defined(__AVR_ATmega32U4__)
+        if (UDADDR & _BV(ADDEN))
+        {
+            // Make sure to reduce brightness, in case a large strip
+            // is being powered through USB. Only works on ATmega32u4
+            setBrightness(NEOPIXEL_USB_BRIGHTNESS);
+        }
+#endif
+
+        settings.setColor(0xFFFFA5);
+        settings.initState(STATE_COLOR_CHANGE);
+#else
+        settings.setColor(0xFF00);
+        settings.initState(STATE_RUN);
+#endif
+    }
+    else
+    {
+        DEBUG_PRINTLN('O');
+    }
+
+    DEBUG_PRINTLN('P');
 }
 
 void setBrightness(uint8_t bright)
@@ -213,78 +464,71 @@ void setBrightness(uint8_t bright)
     }
 
     strip.setBrightness(bright);
-    brightness = bright;
+    settings.setBrightness(bright);
 
-    if (state == STATE_NONE)
+    if (settings.getState() == STATE_NONE)
     {
-        state = STATE_COLOR_CHANGE;
-        offset = 0;
+        settings.setState(STATE_COLOR_CHANGE);
+        settings.setOffset(0);
     }
-}
-
-bool checkTime(uint32_t timeout)
-{
-    if ((millis() - lastChange) < timeout)
-    {
-        // Wait another receive cycle.
-        return false;
-    }
-
-    lastChange = millis();
-    return true;
 }
 
 // Fill the dots one after the other with a color
 void colorWipe()
 {
-    if (! checkTime(NEOPIXEL_COLOR_DELAY))
+    if (! settings.checkTime(NEOPIXEL_COLOR_DELAY))
     {
         return;
     }
 
-    strip.setPixelColor(offset, color);
+    strip.setPixelColor(settings.getOffset(), settings.getColor());
     strip.show();
 
-    offset += direction;
-    if (offset > NEOPIXEL_COUNT)
+    if (settings.updateOffset() > NEOPIXEL_COUNT)
     {
         // Done!
-        state = STATE_NONE;
+        settings.setState(STATE_NONE);
     }
 }
 
+#ifndef NO_RAINBOW
 void rainbow()
 {
-    if (! checkTime(NEOPIXEL_RAINBOW_DELAY))
+    if (! settings.checkTime(NEOPIXEL_RAINBOW_DELAY))
     {
         return;
     }
 
+    int16_t offset = settings.getOffset();
     for(uint8_t i = 0; i < NEOPIXEL_COUNT; i++)
     {
         strip.setPixelColor(i, Wheel((i + offset) & 255));
     }
+
     strip.show();
-
-    offset = (offset + direction) % 256;
+    settings.updateOffsetWrap(256);
 }
+#endif
 
+#ifndef NO_FADE
 // Slightly different, this makes the rainbow equally distributed throughout
 void fadeColors()
 {
-    if (! checkTime(NEOPIXEL_RAINBOW_DELAY))
+    if (! settings.checkTime(NEOPIXEL_RAINBOW_DELAY))
     {
         return;
     }
 
+    int16_t offset = settings.getOffset();
     for(uint8_t i = 0; i < NEOPIXEL_COUNT; i++)
     {
         strip.setPixelColor(i, Wheel(((i * 256 / NEOPIXEL_COUNT) + offset) & 255));
     }
-    strip.show();
 
-    offset = (offset + direction) % 256;
+    strip.show();
+    settings.updateOffsetWrap(256);
 }
+#endif
 
 // Input a value 0 to 255 to get a color value.
 // The colours are a transition r - g - b - back to r.
@@ -292,57 +536,70 @@ uint32_t Wheel(byte WheelPos)
 {
     if(WheelPos < 85)
     {
-        return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+        WheelPos *= 3;
+        return strip.Color(WheelPos, 255 - WheelPos, 0);
     }
     else if(WheelPos < 170)
     {
         WheelPos -= 85;
-        return strip.Color(255 - WheelPos * 3, 0, WheelPos * 3);
+        WheelPos *= 3;
+        return strip.Color(255 - WheelPos, 0, WheelPos);
     }
     else
     {
         WheelPos -= 170;
-        return strip.Color(0, WheelPos * 3, 255 - WheelPos * 3);
+        WheelPos *= 3;
+        return strip.Color(0, WheelPos, 255 - WheelPos);
     }
 }
 
 void run()
 {
-    if (! checkTime(NEOPIXEL_RAINBOW_DELAY))
+    if (! settings.checkTime(NEOPIXEL_RAINBOW_DELAY))
     {
         return;
     }
 
+    int32_t color = settings.getColor();
+    int16_t offset = settings.getOffset();
+    int8_t direction = settings.getDirection();
+
     strip.setPixelColor(offset, color);
-    strip.setPixelColor(offset - (1 * direction), (color >> 1) & 0x7F7F7F);
-    strip.setPixelColor(offset - (2 * direction), (color >> 2) & 0x3F3F3F);
-    strip.setPixelColor(offset - (3 * direction), (color >> 3) & 0x1F1F1F);
-    strip.setPixelColor(offset - (4 * direction), 0);
+    strip.setPixelColor(offset - direction, (color >> 1) & 0x7F7F7F);
+    strip.setPixelColor(offset - (direction * 2), (color >> 2) & 0x3F3F3F);
+    strip.setPixelColor(offset - (direction * 3), (color >> 3) & 0x1F1F1F);
+    strip.setPixelColor(offset - (direction * 4), 0);
     strip.show();
 
-    offset += direction;
+    offset = settings.updateOffset();
     if ((offset < -4) || (offset > NEOPIXEL_COUNT + 4))
     {
-        state = STATE_NONE;
+        settings.setState(STATE_NONE);
     }
 }
 
+#ifndef NO_CYLON
 void cylon()
 {
     run();
 
+    int16_t offset = settings.getOffset();
     if (offset < 0 || offset > NEOPIXEL_COUNT)
     {
-        direction *= -1;
-        offset += direction;
+        settings.invertDirection();
+        settings.updateOffset();
     }
 }
+#endif
 
+#ifndef NO_FIREWORKS
 void fireworks()
 {
+    int32_t color = settings.getColor();
     if (color < 1 && random(0, 300) < 1)
     {
         color = strip.Color(random(0, 255), random(0, 255), random(0, 255));
+        settings.setColor(color);
     }
 
     if (color > 0)
@@ -350,20 +607,24 @@ void fireworks()
         run();
     }
 
-    if (state == STATE_NONE)
+    if (settings.getState() == STATE_NONE)
     {
-        state = STATE_FIREWORKS;
-        offset = 0;
-        color = 0;
+        settings.initState(STATE_FIREWORKS);
+        settings.setColor(0);
     }
 }
+#endif
 
+#ifndef NO_FLICKER
 void flicker()
 {
-    if (! checkTime(NEOPIXEL_FLICKER_DELAY))
+    if (! settings.checkTime(NEOPIXEL_FLICKER_DELAY))
     {
         return;
     }
+
+    int32_t color = settings.getColor();
+    int32_t variance = settings.getVariance();
 
     uint8_t varr = (variance >> 16) & 0xFF;
     uint8_t varg = (variance >> 8) & 0xFF;
@@ -379,6 +640,7 @@ void flicker()
 
     strip.show();
 }
+#endif
 
 #ifndef NO_SPECTRUM
 void spectrum()
@@ -395,7 +657,7 @@ void spectrum()
         sample |= (ADCH << 8);
 
         // apply sensitivity
-        sample = sample * sensitivity / 10;
+        sample = sample * settings.getSensitivity() / 10;
 
         // convert ADC data to a 16bit signed int
         sample -= 0x0200;
@@ -414,7 +676,7 @@ void spectrum()
     uint8_t cut;
     for (uint8_t i = 0; i < (FHT_N >> 1); i++)
     {
-        cut = cutoff + (32 >> i) - ((i * frequencyRolloff) >> 1);
+        cut = settings.getCutoff() + (32 >> i) - ((i * settings.getFrequencyRolloff()) >> 1);
         if (fht_log_out[i] < cut)
         {
             fht_log_out[i] = 0;
@@ -469,7 +731,7 @@ void spectrum()
         g = 255;
     }
 
-    offset++;
+    int16_t offset = settings.updateOffset();
     if (b > 80)
     {
         offset = 0;
@@ -482,7 +744,7 @@ void spectrum()
     }
     else if (offset > 7)
     {
-        offset = 4;
+        settings.setOffset(4);
         trigger = true;
     }
 
@@ -507,6 +769,7 @@ void readCommand(Adafruit_CC3000_ClientRef client, char* buffer)
 
     while (true)
     {
+        wdt_reset();
         if (client.available())
         {
             current = client.read();
@@ -538,147 +801,200 @@ void readCommand(Adafruit_CC3000_ClientRef client, char* buffer)
     }
 }
 
+int32_t hexStrToInt(char* str)
+{
+    int32_t result = 0;
+    for (; *str != 0; ++str, result <<= 4)
+    {
+        char b = *str;
+        if (b >= '0' && b <= '9')
+            result += b - '0';
+        else if (b >= 'a' && b <= 'f')
+            result += b - 'a' + 10;
+        else if (b >= 'A' && b <= 'F')
+            result += b - 'A' + 10;
+        else
+            break;
+    }
+
+    return result;
+}
+
 void processCommand(Adafruit_CC3000_ClientRef client, char* buffer)
 {
+    wdt_reset();
+
 #ifndef NO_EFFECTS
     SERIAL_PRINTLN((const char*) buffer);
-    if (strcmp(buffer, "rb") == 0)
-    {
-        PRINT_CONTENT(F("Rainbow"));
-        FIX_BRIGHTNESS();
-        state = STATE_RAINBOW;
-        offset = 0;
-        direction = 1;
-    }
-    else if (strcmp(buffer, "fd") == 0)
-    {
-        PRINT_CONTENT(F("Fade"));
-        FIX_BRIGHTNESS();
-        state = STATE_COLOR_FADE;
-        offset = 0;
-        direction = 1;
-    }
-    else if (strcmp(buffer, "st") == 0)
+    if (nps_strcmp(buffer, "st") == 0)
     {
         PRINT_CONTENT(F("Stop"));
         FIX_BRIGHTNESS();
-        state = STATE_NONE;
+        settings.setState(STATE_NONE);
     }
-    else if (strcmp(buffer, "rn") == 0)
+#ifndef NO_RAINBOW
+    else if (nps_strcmp(buffer, "rb") == 0)
+    {
+        PRINT_CONTENT(F("Rainbow"));
+        FIX_BRIGHTNESS();
+        settings.initState(STATE_RAINBOW);
+    }
+#endif
+#ifndef NO_FADE
+    else if (nps_strcmp(buffer, "fd") == 0)
+    {
+        PRINT_CONTENT(F("Fade"));
+        FIX_BRIGHTNESS();
+        settings.initState(STATE_COLOR_FADE);
+    }
+#endif
+#ifndef NO_RUN
+    else if (nps_strcmp(buffer, "rn") == 0)
     {
         PRINT_CONTENT(F("Run"));
         FIX_BRIGHTNESS();
-        state = STATE_RUN;
-        direction = 1;
-        offset = 0;
+        settings.initState(STATE_RUN);
     }
-    else if (strcmp(buffer, "cy") == 0)
+#endif
+#ifndef NO_CYLON
+    else if (nps_strcmp(buffer, "cy") == 0)
     {
         PRINT_CONTENT(F("Cylon"));
         FIX_BRIGHTNESS();
-        state = STATE_CYLON;
-        direction = 1;
-        offset = 0;
+        settings.initState(STATE_CYLON);
     }
-    else if (strcmp(buffer, "fw") == 0)
+#endif
+#ifndef NO_FIREWORKS
+    else if (nps_strcmp(buffer, "fw") == 0)
     {
         PRINT_CONTENT(F("Fireworks"));
         FIX_BRIGHTNESS();
-        state = STATE_FIREWORKS;
-        direction = 1;
-        offset = 0;
+        settings.initState(STATE_FIREWORKS);
     }
+#endif
 #ifndef NO_CANDLE
-    else if (strcmp(buffer, "cn") == 0)
+    else if (nps_strcmp(buffer, "cn") == 0)
     {
         PRINT_CONTENT(F("Candle"));
         FIX_BRIGHTNESS();
-        color = 0xBF3F00;
-        variance = 0x402800;
-        state = STATE_FLICKER;
+        settings.setState(STATE_FLICKER);
+        settings.setColor(0xBF3F00);
+        settings.setVariance(0x402800);
     }
 #endif
 #ifndef NO_SPECTRUM
-    else if (strcmp(buffer, "sp") == 0)
+    else if (nps_strcmp(buffer, "sp") == 0)
     {
         PRINT_CONTENT(F("Spectrum"));
-        state = STATE_SPECTRUM;
         strip.setBrightness(255);
+        settings.initState(STATE_SPECTRUM);
     }
 #endif
     else
 #endif
     if (strlen(buffer) > 1)
     {
-        uint32_t value = atol(buffer + 1);
         if (buffer[0] == 'c')
         {
             PRINT_CONTENT(F("Color: "));
-            PRINT_CONTENT((const char*)(buffer + 1));
-            state = STATE_COLOR_CHANGE;
-            color = value;
-            offset = 0;
-            direction = 1;
+            settings.initState(STATE_COLOR_CHANGE);
+            settings.setColor(hexStrToInt(++buffer));
         }
-#ifndef NO_EFFECTS
+#ifndef NO_FLICKER
         else if (buffer[0] == 'f')
         {
             PRINT_CONTENT(F("Flicker: "));
-            PRINT_CONTENT((const char*)(buffer + 1));
             FIX_BRIGHTNESS();
-            state = STATE_FLICKER;
-            variance = value;
+            settings.setState(STATE_FLICKER);
+            settings.setVariance(hexStrToInt(++buffer));
         }
+#endif
 #ifndef NO_SPECTRUM
         else if (buffer[0] == 's')
         {
             PRINT_CONTENT(F("Sensitivity: "));
-            PRINT_CONTENT((const char*)(buffer + 1));
-            variance = value;
+            settings.setSensitivity(atoi(++buffer));
+            client.print(settings.getSensitivity(), DEC);
         }
         else if (buffer[0] == 'n')
         {
-            PRINT_CONTENT(F("Noise cutoff: "));
-            PRINT_CONTENT((const char*)(buffer + 1));
-            variance = value;
+            PRINT_CONTENT(F("Cutoff: "));
+            settings.setCutoff(atoi(++buffer));
+            client.print(settings.getCutoff(), DEC);
         }
         else if (buffer[0] == 'r')
         {
             PRINT_CONTENT(F("Rolloff: "));
-            PRINT_CONTENT((const char*)(buffer + 1));
-            frequencyRolloff = value;
-        }
-#endif
+            settings.setFrequencyRolloff(atoi(++buffer));
+            client.print(settings.getFrequencyRolloff(), DEC);
+         }
 #endif
         else if (buffer[0] == 'b')
         {
             PRINT_CONTENT(F("Brightness: "));
-            PRINT_CONTENT((const char*)(buffer + 1));
-            setBrightness(value);
+            setBrightness(atoi(++buffer));
+            client.print(settings.getBrightness(), DEC);
         }
     }
 }
 
-void loop(void)
+void checkStatus()
 {
+    wdt_reset();
+    if (cc3000.getStatus() == STATUS_DISCONNECTED)
+    {
+        DEBUG_PRINTLN('S');
+        disconnectCount++;
+        cc3000.stop();
+
+        for (int i = 5; i > 0; --i)
+        {
+            wdt_reset();
+            delay(1000);
+        }
+
+        setupServer();
+    }
+}
+
+void loop()
+{
+    // Reset the watchdog timer
+    checkStatus();
+
+    uint8_t state = settings.getState();
+
     // Try to get a client which is connected.
+    wdt_reset();
     Adafruit_CC3000_ClientRef client = webServer.available();
     if (client && client.available() > 0)
     {
-        SERIAL_PRINTLN("Req");
+        SERIAL_PRINTLN("R");
 
         char buffer[12];
         readCommand(client, buffer);
 
+        wdt_reset();
         client.fastrprint((const __FlashStringHelper*)website_http_data);
         PRINT_CONTENT((const __FlashStringHelper*)website_doctype_data);
         client.fastrprint((const __FlashStringHelper*)website_header_data);
 
 #ifndef WEBSITE_NONE
+        wdt_reset();
         client.fastrprint((const __FlashStringHelper*)website_options_data);
-        client.print(brightness, DEC);
+        client.print(settings.getBrightness(), DEC);
         client.fastrprint((const __FlashStringHelper*)website_color_data);
-        client.print(color, HEX);
+        client.print(settings.getColor(), HEX);
+        wdt_reset();
+        client.fastrprint((const __FlashStringHelper*)website_version_data);
+        client.print(VERSION);
+        client.fastrprint((const __FlashStringHelper*)website_reboot_data);
+        client.print((int32_t)rebootCount, DEC);
+        wdt_reset();
+        client.fastrprint((const __FlashStringHelper*)website_disconnect_data);
+        client.print((int32_t)disconnectCount, DEC);
+        client.fastrprint((const __FlashStringHelper*)website_prevState_data);
+        client.print(prevDebugStage);
 #endif
 
         if ((buffer[0] != '\0') && (buffer[0] != ' '))
@@ -687,16 +1003,19 @@ void loop(void)
             processCommand(client, buffer);
         }
 
+        wdt_reset();
         PRINT_CONTENT((const __FlashStringHelper*)website_footer_data);
 
 #ifdef WEBSITE_HEADER_SEND_LENGTH
-        for (uint8_t remaining_length = WEBSITE_VARIABLE_LENGTH - strlen(buffer) - 1; remaining_length > 0; remaining_length--)
+        for (uint8_t remaining_length = WEBSITE_VARIABLE_LENGTH - strlen(buffer) - 2; remaining_length > 0; remaining_length--)
         {
             client.write('\0');
         }
 #endif
 
+        client.write('\0');
         delay(5);
+        wdt_reset();
         client.close();
     }
     else if (state != STATE_SPECTRUM)
@@ -712,30 +1031,40 @@ void loop(void)
         case STATE_COLOR_CHANGE:
             colorWipe();
             break;
-#ifndef NO_EFFECTS
+#ifndef NO_FADE
         case STATE_COLOR_FADE:
             fadeColors();
             break;
+#endif
+#ifndef NO_RAINBOW
         case STATE_RAINBOW:
             rainbow();
             break;
+#endif
+#ifndef NO_RUN
         case STATE_RUN:
             run();
             break;
+#endif
+#ifndef NO_CYLON
         case STATE_CYLON:
             cylon();
             break;
+#endif
+#ifndef NO_FIREWORKS
         case STATE_FIREWORKS:
             fireworks();
             break;
+#endif
+#ifndef NO_FLICKER
         case STATE_FLICKER:
             flicker();
             break;
+#endif
 #ifndef NO_SPECTRUM
         case STATE_SPECTRUM:
             spectrum();
             break;
-#endif
 #endif
         default:
             break;
