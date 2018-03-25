@@ -6,15 +6,14 @@ This is the source code for an Arduino project for a very small and bare webserv
 a strip or ring of WS2812 LEDs with an integrated driver. For information on the build, check out project page: http://www.helgames.com/projects/arduino-neopixel-server
 
 ## Hardware
-* An Arduino-Compatible microcontroller with at least 28kB of flash available for user code and 2kB of RAM. Arduino Leonardo and Sparkfun Fio v3 are tested and working.
+* An Arduino-Compatible microcontroller with at least 21.5kB of flash available for user code and 2kB of RAM. Arduino Leonardo and Sparkfun Fio v3 are tested and working with all features enabled, leaving ~100B of free program memory when using stripped versions of the driver libraries. The actual memory and flash requirements depend on the number of the LED and the configured feature-set.
 * A strip or ring of WS2812 LEDs (Adafruit NeoPixels, if you will).
 * The CC3000 breakout board or shield from Adafruit.
 * The MAX4466 breakout board from Adafruit, if you want to test the as of yet flimsy and broken spectrum analyzer.
 
 ## Known Issues
-* The spectrum analyzer code only works on Sparkfun Fio v3 with the microphone connected to A4, as that was done in a trial and error fasion during an 8h
-drive.
-* If too many requests are received in a short period of time, the server tends to crash because of memory limitations.
+* The spectrum analyzer code only works on Sparkfun Fio v3 with the microphone connected to A4, as that was done in a trial and error fasion during an 8h drive.
+* If too many requests are received in a short period of time, the server tends to crash because of memory limitations. The server will try to reboot and recover without changing the lighting, but may take some time to recover (or fail to reboot in some circumstances)
 
 ## Build Requirements
 * Adafruit CC3000 Library: https://github.com/adafruit/Adafruit_CC3000_Library
@@ -24,9 +23,9 @@ drive.
 Using the default libraries may result in a binary, that does not fit onto your Arduino. You will
 likely end up with a project, that is 31k or more in binary size. If you want to fit the project
 onto a microcontroller with only 32k flash, use these libraries:
-* Custom Adafruit CC3000 Library: https://github.com/helgames/Adafruit_CC3000_Library
-  - In "utility/cc3000_common.h": define CC3000_TINY_DRIVER, CC3000_TINY_SERVER, CC3000_STANDARD_BUFFER_SIZE, CC3000_SECURE and CC3000_NO_PATCH. Then comment out CC3000_MESSAGES_VERBOSE
-* Custom Adafruit NeoPixel Library: https://github.com/helgames/Adafruit_NeoPixel
+* Forked Adafruit CC3000 Library: https://github.com/helgames/Adafruit_CC3000_Library
+  - In "utility/cc3000_common.h": define CC3000_TINY_DRIVER, CC3000_TINY_SERVER, CC3000_TINY_EXPERIMENTAL, CC3000_STANDARD_BUFFER_SIZE, CC3000_SECURE and CC3000_NO_PATCH. Then comment out CC3000_MESSAGES_VERBOSE and CC3000_DHCP_INFO
+* Forked Adafruit NeoPixel Library: https://github.com/helgames/Adafruit_NeoPixel
   - In "Adafruit_NeoPixel.h": define NEOPIXEL_TINY_DRIVER
 
 ## License
