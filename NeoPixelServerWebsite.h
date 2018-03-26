@@ -87,7 +87,7 @@ Brightness: ";
 "<div>\
 <h3>Mode</h3>\
 <a href='c0'>Off</a>\
-<a href='cFFFF5a'>On</a>\
+<a href='cFFCC66'>On</a>\
 <a href='cFFFFFF'>White</a>\
 <a href='cFF0000'>Red</a>\
 <a href='cFF00'>Green</a>\

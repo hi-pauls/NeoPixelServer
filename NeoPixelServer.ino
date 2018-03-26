@@ -58,8 +58,11 @@ uint8_t pixels[NEOPIXEL_COUNT * 3] __attribute__ ((section (".noinit")));
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NEOPIXEL_COUNT, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800, pixels);
 
 // Wifi adapter setup
-#define CC3000_IRQ   3
-#define CC3000_VBAT  5
+#ifndef CC3000_IRQ
+    #define CC3000_IRQ   3
+    #define CC3000_VBAT  5
+#endif
+
 #define CC3000_CS    10
 Adafruit_CC3000 cc3000 = Adafruit_CC3000(CC3000_CS, CC3000_IRQ, CC3000_VBAT, SPI_CLOCK_DIV4);
 
@@ -408,8 +411,30 @@ void setup()
     if (settings.initializedOnBoot)
     {
         memset(pixels, 0, NEOPIXEL_COUNT * 3);
+
+#ifndef START_ENABLED
         setBrightness(NEOPIXEL_BRIGHTNESS);
         strip.show();
+#else
+#ifdef __AVR_ATmega32U4__
+        // Make sure to reduce brightness, in case a large strip
+        // is being powered through USB. Only works on ATmega32u4
+        int8_t brightness = (UDADDR & _BV(ADDEN)) ? NEOPIXEL_USB_BRIGHTNESS : (NEOPIXEL_BRIGHTNESS - 0x40);
+#else
+        // Always use USB brightness, just to be on the safe side
+        int8_t brightness = NEOPIXEL_USB_BRIGHTNESS;
+#endif
+
+        settings.setColor(0xFFCC66);
+        setBrightness(brightness);
+
+        for (int i = 0; i < NEOPIXEL_COUNT; i++)
+        {
+            wdt_reset();
+            colorWipe();
+            delay(NEOPIXEL_COLOR_DELAY);
+        }
+#endif
     }
     else
     {
@@ -431,21 +456,12 @@ void setup()
         // Initialize the strip.
         DEBUG_PRINTLN('N');
 
-#ifdef START_ENABLED
-#if defined(__AVR_ATmega32U4__)
-        if (UDADDR & _BV(ADDEN))
-        {
-            // Make sure to reduce brightness, in case a large strip
-            // is being powered through USB. Only works on ATmega32u4
-            setBrightness(NEOPIXEL_USB_BRIGHTNESS);
-        }
-#endif
-
-        settings.setColor(0xFFFFA5);
-        settings.initState(STATE_COLOR_CHANGE);
-#else
+#ifndef START_ENABLED
         settings.setColor(0xFF00);
         settings.initState(STATE_RUN);
+#else
+        settings.setColor(0xFFCC66);
+        settings.initState(STATE_COLOR_CHANGE);
 #endif
     }
     else
@@ -463,7 +479,7 @@ void setBrightness(uint8_t bright)
         bright = NEOPIXEL_MAX_BRIGHTNESS;
     }
 
-    strip.setBrightness(bright);
+    strip.initBrightness(bright);
     settings.setBrightness(bright);
 
     if (settings.getState() == STATE_NONE)
