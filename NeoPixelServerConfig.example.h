@@ -6,7 +6,7 @@
 // NeoPixel config
 #define NEOPIXEL_COUNT          16
 #define NEOPIXEL_BRIGHTNESS     192
-#define NEOPIXEL_USB_BRIGHTNESS 192
+#define NEOPIXEL_USB_BRIGHTNESS 8
 #define NEOPIXEL_MAX_BRIGHTNESS 255
 
 // Start with the light enabled
