@@ -104,7 +104,7 @@ Brightness: ";
 <a href='b8'>8</a>\
 <a href='b32'>32</a>\
 <a href='b128'>128</a>\
-<a href='b192'>160</a>\
+<a href='b160'>160</a>\
 <a href='b192'>192</a>\
 <a href='b255'>255</a>\
 <p>\
