@@ -20,7 +20,6 @@ Adafruit_CC3000_Server webServer(WEBSERVER_PORT);
 
 #endif
 
-#define nps_strcmp(lhs, rhs) strcmp(lhs, rhs)
 
 
 #define SETTINGS_PROPERTY(type, name, accessor)                                                   \
@@ -38,12 +37,12 @@ public:
     NOINLINE bool boot()
     {
         // Check magic start and checksum
-        bool magicMatch = nps_strcmp(magic, SETTINGS_MAGIC) == 0;
         if (magicMatch) DEBUG_PRINTLN('I');
 
         bool csMatch = checksum == calcChecksum();
         if (csMatch) DEBUG_PRINTLN('J');
 
+        bool magicMatch = strcmp(magic, SETTINGS_MAGIC) == 0;
         bool versionMatch = VERSION == prevVersion;
         if (versionMatch) DEBUG_PRINTLN('K');
 
@@ -771,14 +770,14 @@ void processCommand(Adafruit_CC3000_ClientRef client, char* buffer)
 
 #ifndef NO_EFFECTS
     SERIAL_PRINTLN((const char*) buffer);
-    if (nps_strcmp(buffer, "st") == 0)
+    if (strcmp(buffer, "st") == 0)
     {
         PRINT_CONTENT(F("Stop"));
         FIX_BRIGHTNESS();
         settings.setState(STATE_NONE);
     }
 #ifndef NO_RAINBOW
-    else if (nps_strcmp(buffer, "rb") == 0)
+    else if (strcmp(buffer, "rb") == 0)
     {
         PRINT_CONTENT(F("Rainbow"));
         FIX_BRIGHTNESS();
@@ -786,7 +785,7 @@ void processCommand(Adafruit_CC3000_ClientRef client, char* buffer)
     }
 #endif
 #ifndef NO_FADE
-    else if (nps_strcmp(buffer, "fd") == 0)
+    else if (strcmp(buffer, "fd") == 0)
     {
         PRINT_CONTENT(F("Fade"));
         FIX_BRIGHTNESS();
@@ -794,7 +793,7 @@ void processCommand(Adafruit_CC3000_ClientRef client, char* buffer)
     }
 #endif
 #ifndef NO_RUN
-    else if (nps_strcmp(buffer, "rn") == 0)
+    else if (strcmp(buffer, "rn") == 0)
     {
         PRINT_CONTENT(F("Run"));
         FIX_BRIGHTNESS();
@@ -802,7 +801,7 @@ void processCommand(Adafruit_CC3000_ClientRef client, char* buffer)
     }
 #endif
 #ifndef NO_CYLON
-    else if (nps_strcmp(buffer, "cy") == 0)
+    else if (strcmp(buffer, "cy") == 0)
     {
         PRINT_CONTENT(F("Cylon"));
         FIX_BRIGHTNESS();
@@ -810,7 +809,7 @@ void processCommand(Adafruit_CC3000_ClientRef client, char* buffer)
     }
 #endif
 #ifndef NO_FIREWORKS
-    else if (nps_strcmp(buffer, "fw") == 0)
+    else if (strcmp(buffer, "fw") == 0)
     {
         PRINT_CONTENT(F("Fireworks"));
         FIX_BRIGHTNESS();
@@ -818,7 +817,7 @@ void processCommand(Adafruit_CC3000_ClientRef client, char* buffer)
     }
 #endif
 #ifndef NO_CANDLE
-    else if (nps_strcmp(buffer, "cn") == 0)
+    else if (strcmp(buffer, "cn") == 0)
     {
         PRINT_CONTENT(F("Candle"));
         FIX_BRIGHTNESS();
@@ -828,7 +827,7 @@ void processCommand(Adafruit_CC3000_ClientRef client, char* buffer)
     }
 #endif
 #ifndef NO_SPECTRUM
-    else if (nps_strcmp(buffer, "sp") == 0)
+    else if (strcmp(buffer, "sp") == 0)
     {
         PRINT_CONTENT(F("Spectrum"));
         strip.setBrightness(255);
