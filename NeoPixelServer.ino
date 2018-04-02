@@ -6,11 +6,6 @@
 #include "Adafruit_CC3000.h"
 #include "Adafruit_CC3000_Server.h"
 
-int32_t rebootCount __attribute__ ((section (".noinit")));
-int32_t disconnectCount __attribute__ ((section (".noinit")));
-char debugStage __attribute__ ((section (".noinit")));
-char prevDebugStage = '0';
-
 #ifndef NO_SPECTRUM
     #include "FHT.h"
 uint8_t pixels[NEOPIXEL_COUNT * 3] __attribute__ ((section (".noinit")));
@@ -20,7 +15,15 @@ Adafruit_CC3000_Server webServer(WEBSERVER_PORT);
 
 #endif
 
+struct DebugState
+{
+    int32_t rebootCount;
+    int32_t disconnectCount;
+    char debugStage;
+    char prevDebugStage;
+};
 
+NO_INIT_ON_RESET DebugState debugState;
 
 #define SETTINGS_PROPERTY(type, name, accessor)                                                   \
     public:                                                                                       \
@@ -51,8 +54,8 @@ public:
             // Different guard begin, not initialized
             memcpy(magic, SETTINGS_MAGIC, SETTINGS_MAGIC_LENGTH);
             magic[SETTINGS_MAGIC_LENGTH] = 0;
-            rebootCount = 0;
-            disconnectCount = 0;
+            debugState.rebootCount = 0;
+            debugState.disconnectCount = 0;
 
             initialized = false;
             lastChange = 0;
@@ -69,11 +72,11 @@ public:
             sensitivity = 10;
             frequencyRolloff = 4;
     #endif
-            prevDebugStage = '0';
+            debugState.prevDebugStage = '0';
         }
         else
         {
-            rebootCount++;
+            debugState.rebootCount++;
         }
 
         prevVersion = VERSION;
@@ -309,8 +312,8 @@ void setupServer()
 
 void setup()
 {
-    prevDebugStage = debugStage;
-    debugStage = '0';
+    debugState.prevDebugStage = debugState.debugStage;
+    debugState.debugStage = '0';
 
     // Enable the watchdog timer
     wdt_reset();
@@ -329,7 +332,7 @@ void setup()
 #endif
 #endif
     SERIAL_PRINTLN(VERSION);
-    SERIAL_PRINTLN(prevDebugStage);
+    SERIAL_PRINTLN(debugState.prevDebugStage);
 
     settings.boot();
 
@@ -888,7 +891,7 @@ void checkStatus()
     if (cc3000.getStatus() == STATUS_DISCONNECTED)
     {
         DEBUG_PRINTLN('S');
-        disconnectCount++;
+        debugState.disconnectCount++;
         cc3000.stop();
 
         for (int i = 5; i > 0; --i)
@@ -933,12 +936,12 @@ void loop()
         client.fastrprint((const __FlashStringHelper*)website_version_data);
         client.print(VERSION);
         client.fastrprint((const __FlashStringHelper*)website_reboot_data);
-        client.print((int32_t)rebootCount, DEC);
+        client.print((int32_t)debugState.rebootCount, DEC);
         wdt_reset();
         client.fastrprint((const __FlashStringHelper*)website_disconnect_data);
-        client.print((int32_t)disconnectCount, DEC);
+        client.print((int32_t)debugState.disconnectCount, DEC);
         client.fastrprint((const __FlashStringHelper*)website_prevState_data);
-        client.print(prevDebugStage);
+        client.print(debugState.prevDebugStage);
 #endif
 
         if ((buffer[0] != '\0') && (buffer[0] != ' '))
