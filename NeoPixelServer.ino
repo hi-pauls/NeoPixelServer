@@ -847,7 +847,7 @@ void processCommand(Adafruit_CC3000_ClientRef client, char* buffer)
 #ifndef NO_FLICKER
         else if (buffer[0] == 'f')
         {
-            PRINT_CONTENT(F("Flicker: "));
+            PRINT_CONTENT(F("F: "));
             FIX_BRIGHTNESS();
             settings.setState(STATE_FLICKER);
             settings.setVariance(hexStrToInt(++buffer));
@@ -856,19 +856,19 @@ void processCommand(Adafruit_CC3000_ClientRef client, char* buffer)
 #ifndef NO_SPECTRUM
         else if (buffer[0] == 's')
         {
-            PRINT_CONTENT(F("Sensitivity: "));
+            PRINT_CONTENT(F("S: "));
             settings.setSensitivity(atoi(++buffer));
             client.print(settings.getSensitivity(), DEC);
         }
         else if (buffer[0] == 'n')
         {
-            PRINT_CONTENT(F("Cutoff: "));
+            PRINT_CONTENT(F("C: "));
             settings.setCutoff(atoi(++buffer));
             client.print(settings.getCutoff(), DEC);
         }
         else if (buffer[0] == 'r')
         {
-            PRINT_CONTENT(F("Rolloff: "));
+            PRINT_CONTENT(F("R: "));
             settings.setFrequencyRolloff(atoi(++buffer));
             client.print(settings.getFrequencyRolloff(), DEC);
          }
