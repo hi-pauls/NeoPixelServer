@@ -54,9 +54,11 @@ public:
 
             brightness = 0;
             color = 0xFF0000;
-            offset = 0;
             variance = 0;
             direction = 1;
+            baseOffset = NEOPIXEL_OFFSET;
+            pixelCount = NEOPIXEL_COUNT;
+            offset = baseOffset;
 
     #ifndef NO_SPECTRUM
             cutoff = 100;
@@ -78,14 +80,18 @@ public:
 
     NO_INLINE void resetOffset()
     {
-        offset += direction;
-        updateChecksum();
+        setOffset(baseOffset);
+    }
+
+    int16_t updateOffset()
+    {
+        setOffset(offset + direction);
         return offset;
     }
 
     NO_INLINE void updateOffsetWrap(int16_t wrap)
     {
-        offset = (offset + direction) % wrap;
+        offset = baseOffset + (offset + direction - baseOffset) % wrap;
         updateChecksum();
     }
 
@@ -111,7 +117,7 @@ public:
     void initState(uint8_t state)
     {
         this->state = state;
-        offset = 0;
+        offset = baseOffset;
         direction = 1;
         updateChecksum();
     }
@@ -151,6 +157,8 @@ private:
     SETTINGS_PROPERTY(bool, initialized, Initialized);
     SETTINGS_PROPERTY(uint8_t, state, State);
     SETTINGS_PROPERTY(int16_t, offset, Offset);
+    SETTINGS_PROPERTY(int16_t, baseOffset, BaseOffset);
+    SETTINGS_PROPERTY(int16_t, pixelCount, PixelCount);
 
     uint32_t lastChange;
     uint8_t checksum;
@@ -204,7 +212,7 @@ void setupErrorReboot(char error)
     if (!settings.getInitialized())
     {
         settings.setColor(0xFF0000);
-        settings.setOffset(0);
+        settings.resetOffset();
         setBrightness(0xFF);
 
         // Reset the watchdog timer a final time before going into the endless loop
@@ -282,7 +290,7 @@ void setupServer()
     if (!settings.getInitialized())
     {
         settings.setColor(0xFF);
-        settings.setOffset(0);
+        settings.resetOffset();
         setBrightness(NEOPIXEL_BRIGHTNESS);
     }
 
@@ -356,7 +364,7 @@ void setup()
         settings.setColor(0xFFCC66);
         setBrightness(brightness);
 
-        for (int i = 0; i < NEOPIXEL_COUNT; i++)
+        for (int i = settings.getBaseOffset(); i < settings.getPixelCount(); i++)
         {
             wdt_reset();
             colorWipe();
@@ -413,7 +421,7 @@ void setBrightness(uint8_t bright)
     if (settings.getState() == STATE_NONE)
     {
         settings.setState(STATE_COLOR_CHANGE);
-        settings.setOffset(0);
+        settings.resetOffset();
     }
 }
 
@@ -428,7 +436,7 @@ void colorWipe()
     strip.setPixelColor(settings.getOffset(), settings.getColor());
     strip.show();
 
-    if (settings.updateOffset() > NEOPIXEL_COUNT)
+    if (settings.updateOffset() > settings.getPixelCount())
     {
         // Done!
         settings.setState(STATE_NONE);
@@ -444,7 +452,7 @@ void rainbow()
     }
 
     int16_t offset = settings.getOffset();
-    for(uint8_t i = 0; i < NEOPIXEL_COUNT; i++)
+    for(uint8_t i = settings.getBaseOffset(); i < settings.getPixelCount(); i++)
     {
         strip.setPixelColor(i, Wheel((i + offset) & 255));
     }
@@ -464,9 +472,9 @@ void fadeColors()
     }
 
     int16_t offset = settings.getOffset();
-    for(uint8_t i = 0; i < NEOPIXEL_COUNT; i++)
+    for(uint8_t i = settings.getBaseOffset(); i < settings.getPixelCount(); i++)
     {
-        strip.setPixelColor(i, Wheel(((i * 256 / NEOPIXEL_COUNT) + offset) & 255));
+        strip.setPixelColor(i, Wheel(((i * 256 / settings.getPixelCount()) + offset) & 255));
     }
 
     strip.show();
@@ -516,7 +524,7 @@ void run()
     strip.show();
 
     offset = settings.updateOffset();
-    if ((offset < -4) || (offset > NEOPIXEL_COUNT + 4))
+    if ((offset < settings.getBaseOffset() - 4) || (offset > settings.getPixelCount() + 4))
     {
         settings.setState(STATE_NONE);
     }
@@ -528,7 +536,7 @@ void cylon()
     run();
 
     int16_t offset = settings.getOffset();
-    if (offset < 0 || offset > NEOPIXEL_COUNT)
+    if (offset < settings.getBaseOffset() || offset > settings.getPixelCount())
     {
         settings.invertDirection();
         settings.updateOffset();
@@ -574,7 +582,7 @@ void flicker()
     uint8_t varg = (variance >> 8) & 0xFF;
     uint8_t varb = variance & 0xFF;
 
-    for (uint8_t i = 0; i < NEOPIXEL_COUNT; i++)
+    for (uint8_t i = settings.getBaseOffset(); i < settings.getPixelCount(); i++)
     {
         uint8_t r = ((color >> 16) & 0xFF) + random(-varr, varr);
         uint8_t g = ((color >> 8) & 0xFF) + random(-varg, varg);
@@ -681,6 +689,7 @@ void spectrum()
         offset = 0;
     }
 
+    int16_t baseOffset = settings.getBaseOffset();
     bool trigger = false;
     if (offset < 4)
     {
@@ -688,20 +697,20 @@ void spectrum()
     }
     else if (offset > 7)
     {
-        settings.setOffset(4);
+        settings.setOffset(baseOffset + 4);
         trigger = true;
     }
 
 
     if (trigger)
     {
-        for (uint8_t i = NEOPIXEL_COUNT - 1; i > 0; i--)
+        for (uint8_t i = settings.getPixelCount() - 1; i > baseOffset; i--)
         {
             strip.setPixelColor(i, strip.getPixelColor(i - 1));
         }
     }
 
-    strip.setPixelColor(0, strip.Color(r, g, b));
+    strip.setPixelColor(baseOffset, strip.Color(r, g, b));
     strip.show();
 }
 #endif
@@ -843,6 +852,16 @@ void processCommand(Adafruit_CC3000_ClientRef client, char* buffer)
             PRINT_CONTENT(F("Color: "));
             settings.initState(STATE_COLOR_CHANGE);
             settings.setColor(hexStrToInt(++buffer));
+        }
+        else if (buffer[0] == 'o')
+        {
+            PRINT_CONTENT(F("O: "));
+            settings.setBaseOffset(atoi(++buffer));
+        }
+        else if (buffer[0] == 'p')
+        {
+            PRINT_CONTENT(F("P: "));
+            settings.setPixelCount(atoi(++buffer));
         }
 #ifndef NO_FLICKER
         else if (buffer[0] == 'f')
