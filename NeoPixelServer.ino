@@ -8,11 +8,6 @@
 
 #ifndef NO_SPECTRUM
     #include "FHT.h"
-uint8_t pixels[NEOPIXEL_COUNT * 3] __attribute__ ((section (".noinit")));
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(NEOPIXEL_COUNT, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800, pixels);
-Adafruit_CC3000 cc3000 = Adafruit_CC3000(CC3000_CS, CC3000_IRQ, CC3000_VBAT, SPI_CLOCK_DIV4);
-Adafruit_CC3000_Server webServer(WEBSERVER_PORT);
-
 #endif
 
 struct DebugState
