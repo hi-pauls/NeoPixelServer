@@ -1,0 +1,213 @@
+<!DOCTYPE HTML>
+<!--
+    This is an example of a purely client-side utility webpage for managing multiple servers.
+    You may modify it and then copy it to any device or web-host, that is reachable in your home network.
+    The NeoPixelServer devices do not need to be reachable from the server but must be reachable from the
+    client, accessing the page.
+-->
+<html>
+<head>
+    <title>Lights</title>
+
+    <meta name='viewport' content='width=320,maximum-scale=1.0,minimum-scale=1.0,user-scalable=false'/>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+
+    <style>
+        div.hidden
+        {
+            display: none;
+        }
+
+        div.messages
+        {
+            clear: both;
+            margin: .2em;
+            padding: .2em;
+            background: #EEE;
+        }
+
+        div.messages p
+        {
+            text-align: left;
+            font-size: 1em;
+        }
+
+        div.messages p.message { color: #000; }
+        div.messages p.warning { color: #990; }
+        div.messages p.error { color: #900; }
+
+        div.main
+        {
+            width: 19em;
+            margin: auto;
+        }
+
+        a, p, h3
+        {
+            text-align: center;
+            font-size: 2em;
+            display: block;
+        }
+
+        a:focus, a:hover, a:visited, a:link
+        {
+            font-style: normal;
+            font-weight: bold;
+            text-decoration: none;
+            margin: 5px;
+            padding: 5px;
+            background: #666;
+            color: #FFF;
+            cursor: pointer;
+        }
+    </style>
+    <script>
+        var servers = [ "192.168.0.101", "192.168.0.102" ];
+
+        function setMessagesClass(cls)
+        {
+            document.getElementById('messages').setAttribute('class', cls); return false;
+        }
+
+        function _log(severity, message)
+        {
+            var messages = document.getElementById("messages");
+            messages.innerHTML += "<p class='" + severity + "'>" + message + "</p>";
+        }
+
+        function log(message)
+        {
+            _log("message", message);
+            console.log(message);
+        }
+
+        function warning(message)
+        {
+            _log("warning", message);
+            console.warn(message);
+        }
+
+        function error(message)
+        {
+            _log("error", message);
+            console.error(message);
+        }
+
+        function setServerStatus(index, text)
+        {
+            var server = servers[index];
+            var statusId = "status" + index;
+            var status = document.getElementById(statusId);
+            if (!status)
+            {
+                var parent = document.getElementById("status");
+
+                var headline = document.createElement("h3");
+                headline.innerHTML = server;
+                parent.appendChild(headline);
+
+                status = document.createElement("p");
+                status.setAttribute("id", statusId);
+                parent.appendChild(status);
+            }
+
+            status.innerHTML = text;
+        }
+
+        function sendToLight(index, command)
+        {
+            var url = "http://" + servers[index];
+            if (command != "")
+            {
+                url += "/" + command;
+            }
+
+            log("Sending " + url);
+            var req = new XMLHttpRequest();
+
+            req.onreadystatechange = function()
+            {
+                if (req.readyState != 4)
+                {
+                    return;
+                }
+
+                if (req.status == 200)
+                {
+
+                    // Use text parsing instead of DOM, its more stable in this case
+                    var text = req.responseText;
+                    text = text.replace(/^.*<p>/g, "");
+                    text = text.replace(/<\/p>.*$/g, "");
+                    setServerStatus(index, text);
+                }
+                else
+                {
+                    error("Request " + url + " failed: " + req.statusText);
+                    setServerStatus(index, "Unreachable");
+                }
+            };
+
+            req.open("GET", url, true);
+            req.timeout = 10000;
+            req.send();
+            return false;
+        }
+
+        function sendToLights(command)
+        {
+            for (i = 0; i < servers.length; i++)
+            {
+                sendToLight(i, command);
+            }
+
+            return false;
+        }
+
+        window.onload = function()
+        {
+            sendToLights("");
+        }
+    </script>
+</head>
+<body>
+    <div class="main">
+        <h3>Mode</h3>
+        <a href='#' onclick="sendToLights('c0')">Off</a>
+        <a href='#' onclick="sendToLights('cFFCC66')">On</a>
+        <h3>Effects</h3>
+        <a href='#' onclick="sendToLights('cFFFFFF')">White</a>
+        <a href='#' onclick="sendToLights('cFF0000')">Red</a>
+        <a href='#' onclick="sendToLights('cFF00')">Green</a>
+        <a href='#' onclick="sendToLights('cFF')">Blue</a>
+        <a href='#' onclick="sendToLights('fd')">Fade</a>
+        <a href='#' onclick="sendToLights('rb')">Rainbow</a>
+        <a href='#' onclick="sendToLights('cn')">Candle</button>
+        <a href='#' onclick="sendToLights('fw')">Fireworks</a>
+        <a href='#' onclick="sendToLights('rn')">Run</a>
+        <a href='#' onclick="sendToLights('cy')">Cylon</a>
+        <a href='#' onclick="sendToLights('st')">Stop</a>
+        <h3>Brightness</h3>
+        <a href='#' onclick="sendToLights('b8')">Home Cinema</a>
+        <a href='#' onclick="sendToLights('b160')">Normal</a>
+        <a href='#' onclick="sendToLights('b192')">Bright</a>
+        <h3>Living Room</h3>
+        <a href='#' onclick="sendToLight(0, 'c0')">Off</a>
+        <a href='#' onclick="sendToLight(0, 'cFFCC66')">On</a>
+        <a href='#' onclick="sendToLight(0, 'o0')">Spot On</a>
+        <a href='#' onclick="sendToLight(0, 'o40')">Spot Off</a>
+        <p id="status0"></p>
+        <h3>Kitchen</h3>
+        <a href='#' onclick="sendToLight(1, 'c0')">Off</a>
+        <a href='#' onclick="sendToLight(1, 'cFFCC66')">On</a>
+        <a href='#' onclick="sendToLight(1, 'sp')">Spectrum</a>
+        <p id="status1"></p>
+        <div id="status"></div>
+        <a href="#" onclick="setMessagesClass('messages')">Show Debug</a>
+        <a href="#" onclick="setMessagesClass('hidden')">Hide Debug</a>
+    </div>
+    <div id="messages" class="hidden"></div>
+</body>
+</html>
