@@ -35,17 +35,14 @@ public:
     bool boot()
     {
         // Check magic start and checksum
-        if (magicMatch) DEBUG_PRINTLN('I');
-
-        bool csMatch = checksum == calcChecksum();
-        if (csMatch) DEBUG_PRINTLN('J');
-
         bool magicMatch = strcmp(magic, SETTINGS_MAGIC) == 0;
         bool versionMatch = VERSION == prevVersion;
-        if (versionMatch) DEBUG_PRINTLN('K');
+        bool csMatch = checksum == calcChecksum();
 
         if (initializedOnBoot = !(magicMatch && csMatch && versionMatch))
         {
+            DEBUG_PRINTLN('I');
+
             // Different guard begin, not initialized
             memcpy(magic, SETTINGS_MAGIC, SETTINGS_MAGIC_LENGTH);
             magic[SETTINGS_MAGIC_LENGTH] = 0;
