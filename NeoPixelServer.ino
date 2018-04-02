@@ -165,7 +165,12 @@ private:
 };
 
 // Runtime data
-Settings settings __attribute__ ((section (".noinit")));
+NO_INIT_ON_RESET Settings settings;
+NO_INIT_ON_RESET uint8_t pixels[NEOPIXEL_COUNT * 3];
+
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(NEOPIXEL_COUNT, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800, pixels);
+Adafruit_CC3000 cc3000 = Adafruit_CC3000(CC3000_PIN_CS, CC3000_PIN_IRQ, CC3000_PIN_VBAT, SPI_CLOCK_DIV4);
+Adafruit_CC3000_Server webServer = Adafruit_CC3000_Server(WEBSERVER_PORT);
 
 #ifndef NO_SPECTRUM
 void setupMicrophone()
