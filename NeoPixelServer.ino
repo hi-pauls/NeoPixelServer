@@ -32,7 +32,7 @@ class Settings
 public:
     char magic[SETTINGS_MAGIC_LENGTH + 1];
 
-    NOINLINE bool boot()
+    bool boot()
     {
         // Check magic start and checksum
         if (magicMatch) DEBUG_PRINTLN('I');
@@ -79,26 +79,26 @@ public:
         return initializedOnBoot;
     }
 
-    NOINLINE int16_t updateOffset()
+    NO_INLINE void resetOffset()
     {
         offset += direction;
         updateChecksum();
         return offset;
     }
 
-    NOINLINE void updateOffsetWrap(int16_t wrap)
+    NO_INLINE void updateOffsetWrap(int16_t wrap)
     {
         offset = (offset + direction) % wrap;
         updateChecksum();
     }
 
-    NOINLINE void invertDirection()
+    void invertDirection()
     {
         direction = -direction;
         updateChecksum();
     }
 
-    NOINLINE bool checkTime(uint32_t timeout)
+    NO_INLINE bool checkTime(uint32_t timeout)
     {
         uint32_t current = millis();
         if ((current - lastChange) < timeout)
@@ -111,7 +111,7 @@ public:
         return true;
     }
 
-    NOINLINE void initState(uint8_t state)
+    void initState(uint8_t state)
     {
         this->state = state;
         offset = 0;
@@ -123,7 +123,7 @@ public:
     char prevVersion;
 
 private:
-    NOINLINE uint8_t calcChecksum()
+    uint8_t calcChecksum()
     {
         uint8_t checksum = 0;
         uint8_t size = sizeof(Settings) - 4;
