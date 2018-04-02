@@ -123,7 +123,7 @@ private:
     uint8_t calcChecksum()
     {
         uint8_t checksum = 0;
-        uint8_t size = sizeof(Settings) - 4;
+        size_t size = sizeof(Settings) - sizeof(lastChange) - sizeof(checksum);
         uint8_t* dataPtr = (uint8_t*)(this);
         for (uint8_t i = 0; i < size; ++i, ++dataPtr)
         {
