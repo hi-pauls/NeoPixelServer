@@ -3,22 +3,10 @@
 
 #include <avr/pgmspace.h>
 
-// Save about 1.8kB of flash
-//#define WEBSITE_NONE
-
-// Save about 700b of flash
-//#define WEBSITE_SHORT
-
 // Send the length attribute (not necessary)
 //#define WEBSITE_HEADER_SEND_LENGTH
-
-// Sanitize the config a bit
-#if defined(WEBSITE_NONE) && defined(WEBSITE_SHORT)
-    // Make sure only one content configuration is active. None over short.
-    #undef WEBSITE_SHORT
-#endif
-#if (defined(WEBSITE_NONE) || defined(WEBSITE_SHORT)) && defined(WEBSITE_HEADER_SEND_LENGTH)
-    // Never send length in short mode
+#if defined(WEBSITE_HEADER_SEND_LENGTH) && ((WEBSITE_TYPE == WEBSITE_NONE) || (WEBSITE_TYPE == WEBSITE_SHORT))
+    // Never send length in short or none mode
     #undef WEBSITE_HEADER_SEND_LENGTH
 #endif
 
@@ -30,6 +18,7 @@ Server: arduino\n\
 Cache-Control: no-store, no-cache, must-revalidate\n\
 Pragma: no-cache\n\
 Connection: close\n\
+Access-Control-Allow-Origin: *\n\
 Content-Type: text/html\n\
 Content-Length: 856\n";
 #else
@@ -38,11 +27,12 @@ Server: arduino\n\
 Cache-Control: no-store, no-cache, must-revalidate\n\
 Pragma: no-cache\n\
 Connection: close\n\
+Access-Control-Allow-Origin: *\n\
 Content-Type: text/html\n\n";
 #endif
 
 const char PROGMEM website_doctype_data[] =
-#if defined(WEBSITE_NONE) || defined(WEBSITE_SHORT)
+#if WEBSITE_TYPE == WEBSITE_NONE || WEBSITE_TYPE == WEBSITE_SHORT
 "";
 #define WEBSITE_DOCTYPE_LENGTH   (0)
 #else
@@ -51,21 +41,37 @@ const char PROGMEM website_doctype_data[] =
 #endif
 
 const char PROGMEM website_header_data[] =
-#if defined(WEBSITE_NONE)
+#if WEBSITE_TYPE == WEBSITE_NONE
 "<html/>";
 #define WEBSITE_HEADER_LENGTH (7)
-#elif defined(WEBSITE_SHORT)
+#elif WEBSITE_TYPE == WEBSITE_SHORT
 "<html>\
-<head/>\
+<head>\
+<style>\
+a,p,h3{display:block}\
+</style>\
+</head>\
 <body>";
-#define WEBSITE_HEADER_LENGTH    (6 + 7 + 6)
+#define WEBSITE_HEADER_LENGTH    (6 + 6 + 7 + 21 + 8 + 7 + 6)
+#else
+#ifdef WEBSITE_MINIMAL_CSS
+"<html>\
+<head>\
+<title>Lights</title>\
+<meta name='viewport' content='width=320,maximum-scale=1.0,minimum-scale=1.0,user-scalable=false'/>\
+<style>\
+a,p,h3{display:block}\
+</style>\
+</head>\
+<body>";
+#define WEBSITE_HEADER_LENGTH    (6 + 6 + 21 + 99 + 7 + 21 + 8 + 7 + 6)
 #else
 "<html>\
 <head>\
 <title>Lights</title>\
 <meta name='viewport' content='width=320,maximum-scale=1.0,minimum-scale=1.0,user-scalable=false'/>\
 <style>\
-div{width:20em;margin:auto;}\
+div{width:19em;margin:auto;}\
 a,p,h3{text-align:center;font-size:2em;display:block}\
 a:focus,a:hover,a:visited,a:link{font-style:normal;font-weight:bold;text-decoration:none;margin:5px;padding:5px;background:#666;color:#FFF;}\
 </style>\
@@ -73,12 +79,13 @@ a:focus,a:hover,a:visited,a:link{font-style:normal;font-weight:bold;text-decorat
 <body>";
 #define WEBSITE_HEADER_LENGTH    (6 + 6 + 21 + 99 + 7 + 28 + 53 + 140 + 8 + 7 + 6)
 #endif
+#endif
 
 const char PROGMEM website_options_data[] =
-#if defined(WEBSITE_NONE)
+#if WEBSITE_TYPE == WEBSITE_NONE
 "";
 #define WEBSITE_OPTIONS_LENGTH   (0)
-#elif defined(WEBSITE_SHORT)
+#elif WEBSITE_TYPE == WEBSITE_SHORT
 "<div>\
 <p>\
 Brightness: ";
@@ -113,7 +120,7 @@ Brightness: ";
 #endif
 
 const char PROGMEM website_color_data[] =
-#ifdef WEBSITE_NONE
+#if WEBSITE_TYPE == WEBSITE_NONE
 "";
 #define WEBSITE_COLOR_LENGTH   0
 #else
@@ -122,43 +129,43 @@ const char PROGMEM website_color_data[] =
 #endif
 
 const char PROGMEM website_version_data[] =
-#ifdef WEBSITE_NONE
+#if WEBSITE_TYPE == WEBSITE_NONE
 "";
 #define WEBSITE_VERSION_LENGTH   0
 #else
-"<br/>Version: ";
-#define WEBSITE_VERSION_LENGTH   14
+"<br/>V/R/D/Prev: ";
+#define WEBSITE_VERSION_LENGTH   17
 #endif
 
 const char PROGMEM website_reboot_data[] =
-#ifdef WEBSITE_NONE
+#if WEBSITE_TYPE == WEBSITE_NONE
 "";
 #define WEBSITE_REBOOT_LENGTH   0
 #else
-"<br/>Reboots: ";
-#define WEBSITE_REBOOT_LENGTH   14
+", ";
+#define WEBSITE_REBOOT_LENGTH   2
 #endif
 
 const char PROGMEM website_disconnect_data[] =
-#ifdef WEBSITE_NONE
+#if WEBSITE_TYPE == WEBSITE_NONE
 "";
 #define WEBSITE_DISCONNECT_LENGTH   0
 #else
-"<br/>Disconnect: ";
-#define WEBSITE_DISCONNECT_LENGTH   17
+", ";
+#define WEBSITE_DISCONNECT_LENGTH   2
 #endif
 
 const char PROGMEM website_prevState_data[] =
-#ifdef WEBSITE_NONE
+#if WEBSITE_TYPE == WEBSITE_NONE
 "";
 #define WEBSITE_PREVSTATE_LENGTH   0
 #else
-"<br/>Prev State: ";
-#define WEBSITE_PREVSTATE_LENGTH   17
+", ";
+#define WEBSITE_PREVSTATE_LENGTH   2
 #endif
 
 const char PROGMEM website_command_data[] =
-#ifdef WEBSITE_NONE
+#if WEBSITE_TYPE == WEBSITE_NONE
 "";
 #define WEBSITE_COMMAND_LENGTH   0
 #else
@@ -167,7 +174,7 @@ const char PROGMEM website_command_data[] =
 #endif
 
 const char PROGMEM website_footer_data[] =
-#ifdef WEBSITE_NONE
+#if WEBSITE_TYPE == WEBSITE_NONE
 "";
 #define WEBSITE_FOOTER_LENGTH    0
 #else
