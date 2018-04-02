@@ -50,7 +50,6 @@ public:
             debugState.disconnectCount = 0;
 
             initialized = false;
-            lastChange = 0;
             state = STATE_NONE;
 
             brightness = 0;
@@ -71,6 +70,7 @@ public:
             debugState.rebootCount++;
         }
 
+        lastChange = 0;
         prevVersion = VERSION;
         updateChecksum();
         return initializedOnBoot;
@@ -104,7 +104,7 @@ public:
             return false;
         }
 
-        setLastChange(current);
+        lastChange = current;
         return true;
     }
 
@@ -151,8 +151,8 @@ private:
     SETTINGS_PROPERTY(bool, initialized, Initialized);
     SETTINGS_PROPERTY(uint8_t, state, State);
     SETTINGS_PROPERTY(int16_t, offset, Offset);
-    SETTINGS_PROPERTY(uint32_t, lastChange, LastChange);
 
+    uint32_t lastChange;
     uint8_t checksum;
 };
 
