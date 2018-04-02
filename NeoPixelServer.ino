@@ -176,7 +176,7 @@ Adafruit_CC3000_Server webServer = Adafruit_CC3000_Server(WEBSERVER_PORT);
 void setupMicrophone()
 {
     // Get the analog input pin for the microphone
-    uint8_t pin = MIC_PIN;
+    uint8_t pin = SPECTRUM_IN_PIN;
 #ifdef __AVR_ATmega32u4__
     if (pin >= 18)
     {
