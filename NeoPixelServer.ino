@@ -1,103 +1,32 @@
 #include <avr/wdt.h>
 #include <SPI.h>
 #include "Adafruit_NeoPixel.h"
-#include "NeoPixelServerConfig.h"
+#include "NeoPixelServerDefs.h"
 #include "NeoPixelServerWebsite.h"
 #include "Adafruit_CC3000.h"
 #include "Adafruit_CC3000_Server.h"
 
-#define VERSION '7'
 int32_t rebootCount __attribute__ ((section (".noinit")));
 int32_t disconnectCount __attribute__ ((section (".noinit")));
 char debugStage __attribute__ ((section (".noinit")));
 char prevDebugStage = '0';
 
-// Save about 600B of flash
-#ifdef NO_SERIAL
-    #define SERIAL_PRINTLN(content)
-    #define DEBUG_PRINTLN(content)   debugStage = content
-#else
-    #define SERIAL_PRINTLN(content)  Serial.println(content);
-    #define DEBUG_PRINTLN(content)   { debugStage = content; Serial.println(content); }
-#endif
-
-// Save about 5.2kB of flash
-#ifdef NO_EFFECTS
-    // Can also be defined separately
-    #define NO_FADE
-    #define NO_RAINBOW
-    #define NO_FLICKER
-    #define NO_FIREWORKS
-    #define NO_RUN
-    #define NO_CYLON
-    #define NO_SPECTRUM
-#endif
-
-#ifdef NO_CYLON
-    #define ERROR()  colorWipe()
-#else
-    #define ERROR()  cylon()
-#endif
-
-// Save about 2.7kB of flash
-#ifdef NO_SPECTRUM
-    #define FIX_BRIGHTNESS()
-#else
+#ifndef NO_SPECTRUM
     #include "FHT.h"
-
-    #define MIC_PIN A5
-    #define FIX_BRIGHTNESS()  setBrightness(settings.getBrightness())
-#endif
-
-// NeoPixel Strip setup
-#define NEOPIXEL_PIN            6
-#define NEOPIXEL_COLOR_DELAY    40
-#define NEOPIXEL_RAINBOW_DELAY  20
-#define NEOPIXEL_FLICKER_DELAY  100
 uint8_t pixels[NEOPIXEL_COUNT * 3] __attribute__ ((section (".noinit")));
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NEOPIXEL_COUNT, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800, pixels);
-
-// Wifi adapter setup
-#ifndef CC3000_IRQ
-    #define CC3000_IRQ   3
-    #define CC3000_VBAT  5
-#endif
-
-#define CC3000_CS    10
 Adafruit_CC3000 cc3000 = Adafruit_CC3000(CC3000_CS, CC3000_IRQ, CC3000_VBAT, SPI_CLOCK_DIV4);
-
-// Web server setup
-#define WEBSERVER_PORT  80
 Adafruit_CC3000_Server webServer(WEBSERVER_PORT);
 
-#ifdef WEBSITE_NONE
-    #define PRINT_CONTENT(content)
-#else
-    #define PRINT_CONTENT(content)  client.fastrprint(content)
-#endif
-
-#ifndef NOINLINE
-    #define NOINLINE __attribute__ ((noinline))
 #endif
 
 #define nps_strcmp(lhs, rhs) strcmp(lhs, rhs)
 
-#define STATE_NONE          0
-#define STATE_COLOR_CHANGE  1
-#define STATE_COLOR_FADE    2
-#define STATE_RAINBOW       3
-#define STATE_RUN           4
-#define STATE_CYLON         5
-#define STATE_FIREWORKS     6
-#define STATE_FLICKER       7
-#define STATE_SPECTRUM      8
 
-#define SETTINGS_MAGIC         "Nps"
-#define SETTINGS_MAGIC_LENGTH  3
 #define SETTINGS_PROPERTY(type, name, accessor)                                                   \
     public:                                                                                       \
         type get ## accessor() const { return name; }                                             \
-        NOINLINE void set ## accessor(type name) { this->name = name; this->updateChecksum(); }   \
+        NO_INLINE void set ## accessor(type name) { this->name = name; this->updateChecksum(); }  \
     private:                                                                                      \
         type name
 
@@ -995,7 +924,7 @@ void loop()
         PRINT_CONTENT((const __FlashStringHelper*)website_doctype_data);
         client.fastrprint((const __FlashStringHelper*)website_header_data);
 
-#ifndef WEBSITE_NONE
+#if WEBSITE_TYPE != WEBSITE_NONE
         wdt_reset();
         client.fastrprint((const __FlashStringHelper*)website_options_data);
         client.print(settings.getBrightness(), DEC);
