@@ -155,7 +155,7 @@
         #pragma message ("Minimal CSS website")
     #endif
 
-    #define PRINT_CONTENT(content)  client.fastrprint(content)
+    #define PRINT_CONTENT(content)  _sopt_clientPrintString(content)
 #endif
 
 #ifdef START_ENABLED

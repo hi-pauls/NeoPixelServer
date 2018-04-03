@@ -171,6 +171,78 @@ NO_INIT_ON_RESET uint8_t pixels[NEOPIXEL_COUNT * 3];
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NEOPIXEL_COUNT, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800, pixels);
 Adafruit_CC3000 cc3000 = Adafruit_CC3000(CC3000_PIN_CS, CC3000_PIN_IRQ, CC3000_PIN_VBAT, SPI_CLOCK_DIV4);
 Adafruit_CC3000_Server webServer = Adafruit_CC3000_Server(WEBSERVER_PORT);
+Adafruit_CC3000_ClientRef* client = NULL;
+
+// Binary size optimization functions
+int16_t _settings_updateOffset()
+{
+    return settings.updateOffset();
+}
+
+void _settings_resetOffset()
+{
+    settings.resetOffset();
+}
+
+void _settings_setState(uint8_t state)
+{
+    settings.setState(state);
+}
+
+void _settings_initState(uint8_t state)
+{
+    settings.initState(state);
+}
+
+NO_INLINE uint32_t _settings_getColor()
+{
+    return settings.getColor();
+}
+
+void _settings_setColor(uint32_t color)
+{
+    settings.setColor(color);
+}
+
+void _strip_show()
+{
+    strip.show();
+}
+
+void _client_print(char chr)
+{
+    client->print(chr);
+}
+
+void _client_print(int32_t value, uint8_t type)
+{
+    client->print(value, type);
+}
+
+void _client_fastrprint(const __FlashStringHelper* str)
+{
+    client->fastrprint(str);
+}
+
+#define _sopt_getOffset()                     settings.getOffset()
+#define _sopt_setOffset(offset)               settings.setOffset(offset)
+#define _sopt_updateOffset()                  _settings_updateOffset()
+#define _sopt_resetOffset()                   _settings_resetOffset()
+#define _sopt_getBaseOffset()                 settings.getBaseOffset()
+#define _sopt_getPixelCount()                 settings.getPixelCount()
+#define _sopt_getState()                      settings.getState()
+#define _sopt_setState(state)                 _settings_setState(state)
+#define _sopt_initState(state)                _settings_initState(state)
+#define _sopt_getBrightness()                 settings.getBrightness()
+#define _sopt_getColor()                      _settings_getColor()
+#define _sopt_setColor(color)                 _settings_setColor(color)
+#define _sopt_show()                          _strip_show()
+#define _sopt_getInitialized()                settings.getInitialized()
+#define _sopt_checkTime(timeout)              settings.checkTime(timeout)
+#define _sopt_clientPrint(chr)                _client_print(chr)
+#define _sopt_clientPrintValue(value, type)   _client_print(value, type)
+#define _sopt_clientPrintString(fstr)         _client_fastrprint(fstr)
+
 void setPixelColor(int16_t index, uint32_t color)
 {
     if (_sopt_getBaseOffset() <= index && index < _sopt_getPixelCount())
@@ -179,6 +251,13 @@ void setPixelColor(int16_t index, uint32_t color)
     }
 }
 
+void setStripColor(int16_t start, int16_t end, uint32_t color)
+{
+    for (int16_t i = end - 1; i >= start; --i)
+    {
+        strip.setPixelColor(i, color);
+    }
+}
 
 #ifndef NO_SPECTRUM
 void setupMicrophone()
@@ -217,10 +296,10 @@ void setupMicrophone()
 void setupErrorReboot(char error)
 {
     DEBUG_PRINTLN(error);
-    if (!settings.getInitialized())
+    if (!_sopt_getInitialized())
     {
-        settings.setColor(0xFF0000);
-        settings.resetOffset();
+        _sopt_setColor(0xFF0000);
+        _sopt_resetOffset();
         setBrightness(0xFF);
 
         // Reset the watchdog timer a final time before going into the endless loop
@@ -241,7 +320,7 @@ void setupErrorReboot(char error)
 
 void setupErrorFrame()
 {
-    if (!settings.getInitialized())
+    if (!_sopt_getInitialized())
     {
         ERROR();
     }
@@ -295,10 +374,10 @@ void setupServer()
 
     // Block until DHCP address data is available, or forever, if it isn't.
     DEBUG_PRINTLN('V');
-    if (!settings.getInitialized())
+    if (!_sopt_getInitialized())
     {
-        settings.setColor(0xFF);
-        settings.resetOffset();
+        _sopt_setColor(0xFF);
+        _sopt_resetOffset();
         setBrightness(NEOPIXEL_BRIGHTNESS);
     }
 
@@ -354,11 +433,11 @@ void setup()
 
     if (settings.initializedOnBoot)
     {
-        memset(pixels, 0, NEOPIXEL_COUNT * 3);
+        setStripColor(0, NEOPIXEL_COUNT, 0);
 
 #ifndef START_ENABLED
         setBrightness(NEOPIXEL_BRIGHTNESS);
-        strip.show();
+        _sopt_show();
 #else
 #ifdef __AVR_ATmega32U4__
         // Make sure to reduce brightness, in case a large strip
@@ -369,10 +448,10 @@ void setup()
         int8_t brightness = NEOPIXEL_USB_BRIGHTNESS;
 #endif
 
-        settings.setColor(0xFFCC66);
+        _sopt_setColor(0xFFCC66);
         setBrightness(brightness);
 
-        for (int i = settings.getBaseOffset(); i < settings.getPixelCount(); i++)
+        for (int i = _sopt_getBaseOffset(); i < _sopt_getPixelCount(); i++)
         {
             wdt_reset();
             colorWipe();
@@ -382,7 +461,7 @@ void setup()
     }
     else
     {
-        strip.initBrightness(settings.getBrightness());
+        strip.initBrightness(_sopt_getBrightness());
     }
 
 #ifndef NO_SPECTRUM
@@ -401,11 +480,11 @@ void setup()
         DEBUG_PRINTLN('N');
 
 #ifndef START_ENABLED
-        settings.setColor(0xFF00);
-        settings.initState(STATE_RUN);
+        _sopt_setColor(0xFF00);
+        _sopt_initState(STATE_RUN);
 #else
-        settings.setColor(0xFFCC66);
-        settings.initState(STATE_COLOR_CHANGE);
+        _sopt_setColor(0xFFCC66);
+        _sopt_initState(STATE_COLOR_CHANGE);
 #endif
     }
     else
@@ -426,46 +505,46 @@ void setBrightness(uint8_t bright)
     strip.initBrightness(bright);
     settings.setBrightness(bright);
 
-    if (settings.getState() == STATE_NONE)
+    if (_sopt_getState() == STATE_NONE)
     {
-        settings.setState(STATE_COLOR_CHANGE);
-        settings.resetOffset();
+        _sopt_setState(STATE_COLOR_CHANGE);
+        _sopt_resetOffset();
     }
 }
 
 // Fill the dots one after the other with a color
 void colorWipe()
 {
-    if (! settings.checkTime(NEOPIXEL_COLOR_DELAY))
+    if (! _sopt_checkTime(NEOPIXEL_COLOR_DELAY))
     {
         return;
     }
 
-    strip.show();
     setPixelColor(_sopt_getOffset(), _sopt_getColor());
+    _sopt_show();
 
-    if (settings.updateOffset() > settings.getPixelCount())
+    if (_sopt_updateOffset() > _sopt_getPixelCount())
     {
         // Done!
-        settings.setState(STATE_NONE);
+        _sopt_setState(STATE_NONE);
     }
 }
 
 #ifndef NO_RAINBOW
 void rainbow()
 {
-    if (! settings.checkTime(NEOPIXEL_RAINBOW_DELAY))
+    if (! _sopt_checkTime(NEOPIXEL_RAINBOW_DELAY))
     {
         return;
     }
 
-    int16_t offset = settings.getOffset();
-    for(uint8_t i = settings.getBaseOffset(); i < settings.getPixelCount(); i++)
+    int16_t offset = _sopt_getOffset();
+    for(uint8_t i = _sopt_getBaseOffset(); i < _sopt_getPixelCount(); i++)
     {
         setPixelColor(i, Wheel((i + offset) & 255));
     }
 
-    strip.show();
+    _sopt_show();
     settings.updateOffsetWrap(256);
 }
 #endif
@@ -474,18 +553,18 @@ void rainbow()
 // Slightly different, this makes the rainbow equally distributed throughout
 void fadeColors()
 {
-    if (! settings.checkTime(NEOPIXEL_RAINBOW_DELAY))
+    if (! _sopt_checkTime(NEOPIXEL_RAINBOW_DELAY))
     {
         return;
     }
 
-    int16_t offset = settings.getOffset();
-    for(uint8_t i = settings.getBaseOffset(); i < settings.getPixelCount(); i++)
+    int16_t offset = _sopt_getOffset();
+    for(uint8_t i = _sopt_getBaseOffset(); i < _sopt_getPixelCount(); i++)
     {
         setPixelColor(i, Wheel(((i * 256 / _sopt_getPixelCount()) + offset) & 255));
     }
 
-    strip.show();
+    _sopt_show();
     settings.updateOffsetWrap(256);
 }
 #endif
@@ -515,26 +594,26 @@ uint32_t Wheel(byte WheelPos)
 
 void run()
 {
-    if (! settings.checkTime(NEOPIXEL_RAINBOW_DELAY))
+    if (! _sopt_checkTime(NEOPIXEL_RAINBOW_DELAY))
     {
         return;
     }
 
-    int32_t color = settings.getColor();
-    int16_t offset = settings.getOffset();
+    int32_t color = _sopt_getColor();
+    int16_t offset = _sopt_getOffset();
     int8_t direction = settings.getDirection();
 
-    strip.show();
     setPixelColor(offset, color);
     setPixelColor(offset - direction, (color >> 1) & 0x7F7F7F);
     setPixelColor(offset - (direction * 2), (color >> 2) & 0x3F3F3F);
     setPixelColor(offset - (direction * 3), (color >> 3) & 0x1F1F1F);
     setPixelColor(offset - (direction * 4), 0);
+    _sopt_show();
 
-    offset = settings.updateOffset();
-    if ((offset < settings.getBaseOffset() - 4) || (offset > settings.getPixelCount() + 4))
+    offset = _sopt_updateOffset();
+    if ((offset < _sopt_getBaseOffset() - 4) || (offset > _sopt_getPixelCount() + 4))
     {
-        settings.setState(STATE_NONE);
+        _sopt_setState(STATE_NONE);
     }
 }
 
@@ -543,11 +622,11 @@ void cylon()
 {
     run();
 
-    int16_t offset = settings.getOffset();
-    if (offset < settings.getBaseOffset() || offset > settings.getPixelCount())
+    int16_t offset = _sopt_getOffset();
+    if (offset < _sopt_getBaseOffset() || offset > _sopt_getPixelCount())
     {
         settings.invertDirection();
-        settings.updateOffset();
+        _sopt_updateOffset();
     }
 }
 #endif
@@ -555,11 +634,11 @@ void cylon()
 #ifndef NO_FIREWORKS
 void fireworks()
 {
-    int32_t color = settings.getColor();
+    int32_t color = _sopt_getColor();
     if (color < 1 && random(0, 300) < 1)
     {
         color = strip.Color(random(0, 255), random(0, 255), random(0, 255));
-        settings.setColor(color);
+        _sopt_setColor(color);
     }
 
     if (color > 0)
@@ -567,10 +646,10 @@ void fireworks()
         run();
     }
 
-    if (settings.getState() == STATE_NONE)
+    if (_sopt_getState() == STATE_NONE)
     {
-        settings.initState(STATE_FIREWORKS);
-        settings.setColor(0);
+        _sopt_initState(STATE_FIREWORKS);
+        _sopt_setColor(0);
     }
 }
 #endif
@@ -578,19 +657,19 @@ void fireworks()
 #ifndef NO_FLICKER
 void flicker()
 {
-    if (! settings.checkTime(NEOPIXEL_FLICKER_DELAY))
+    if (! _sopt_checkTime(NEOPIXEL_FLICKER_DELAY))
     {
         return;
     }
 
-    int32_t color = settings.getColor();
+    int32_t color = _sopt_getColor();
     int32_t variance = settings.getVariance();
 
     uint8_t varr = (variance >> 16) & 0xFF;
     uint8_t varg = (variance >> 8) & 0xFF;
     uint8_t varb = variance & 0xFF;
 
-    for (uint8_t i = settings.getBaseOffset(); i < settings.getPixelCount(); i++)
+    for (uint8_t i = _sopt_getBaseOffset(); i < _sopt_getPixelCount(); i++)
     {
         uint8_t r = ((color >> 16) & 0xFF) + random(-varr, varr);
         uint8_t g = ((color >> 8) & 0xFF) + random(-varg, varg);
@@ -598,7 +677,7 @@ void flicker()
         setPixelColor(i, strip.Color(r, g, b));
     }
 
-    strip.show();
+    _sopt_show();
 }
 #endif
 
@@ -691,13 +770,13 @@ void spectrum()
         g = 255;
     }
 
-    int16_t offset = settings.updateOffset();
+    int16_t offset = _sopt_updateOffset();
     if (b > 80)
     {
         offset = 0;
     }
 
-    int16_t baseOffset = settings.getBaseOffset();
+    int16_t baseOffset = _sopt_getBaseOffset();
     bool trigger = false;
     if (offset < 4)
     {
@@ -705,25 +784,25 @@ void spectrum()
     }
     else if (offset > 7)
     {
-        settings.setOffset(baseOffset + 4);
+        _sopt_setOffset(baseOffset + 4);
         trigger = true;
     }
 
 
     if (trigger)
     {
-        for (uint8_t i = settings.getPixelCount() - 1; i > baseOffset; i--)
+        for (uint8_t i = _sopt_getPixelCount() - 1; i > baseOffset; i--)
         {
             setPixelColor(i, strip.getPixelColor(i - 1));
         }
     }
 
-    strip.show();
     setPixelColor(baseOffset, strip.Color(r, g, b));
+    _sopt_show();
 }
 #endif
 
-void readCommand(Adafruit_CC3000_ClientRef client, char* buffer)
+void readCommand(char* buffer)
 {
     uint8_t offset = 0;
     char current = '\0';
@@ -731,9 +810,9 @@ void readCommand(Adafruit_CC3000_ClientRef client, char* buffer)
     while (true)
     {
         wdt_reset();
-        if (client.available())
+        if (client->available())
         {
-            current = client.read();
+            current = client->read();
             if (offset < 4)
             {
                 // skip the: 'GET ' part
@@ -781,7 +860,7 @@ int32_t hexStrToInt(char* str)
     return result;
 }
 
-void processCommand(Adafruit_CC3000_ClientRef client, char* buffer)
+void processCommand(char* buffer)
 {
     wdt_reset();
 
@@ -791,14 +870,14 @@ void processCommand(Adafruit_CC3000_ClientRef client, char* buffer)
     {
         PRINT_CONTENT(F("Stop"));
         FIX_BRIGHTNESS();
-        settings.setState(STATE_NONE);
+        _sopt_setState(STATE_NONE);
     }
 #ifndef NO_RAINBOW
     else if (strcmp(buffer, "rb") == 0)
     {
         PRINT_CONTENT(F("Rainbow"));
         FIX_BRIGHTNESS();
-        settings.initState(STATE_RAINBOW);
+        _sopt_initState(STATE_RAINBOW);
     }
 #endif
 #ifndef NO_FADE
@@ -806,7 +885,7 @@ void processCommand(Adafruit_CC3000_ClientRef client, char* buffer)
     {
         PRINT_CONTENT(F("Fade"));
         FIX_BRIGHTNESS();
-        settings.initState(STATE_COLOR_FADE);
+        _sopt_initState(STATE_COLOR_FADE);
     }
 #endif
 #ifndef NO_RUN
@@ -814,7 +893,7 @@ void processCommand(Adafruit_CC3000_ClientRef client, char* buffer)
     {
         PRINT_CONTENT(F("Run"));
         FIX_BRIGHTNESS();
-        settings.initState(STATE_RUN);
+        _sopt_initState(STATE_RUN);
     }
 #endif
 #ifndef NO_CYLON
@@ -822,7 +901,7 @@ void processCommand(Adafruit_CC3000_ClientRef client, char* buffer)
     {
         PRINT_CONTENT(F("Cylon"));
         FIX_BRIGHTNESS();
-        settings.initState(STATE_CYLON);
+        _sopt_initState(STATE_CYLON);
     }
 #endif
 #ifndef NO_FIREWORKS
@@ -830,7 +909,7 @@ void processCommand(Adafruit_CC3000_ClientRef client, char* buffer)
     {
         PRINT_CONTENT(F("Fireworks"));
         FIX_BRIGHTNESS();
-        settings.initState(STATE_FIREWORKS);
+        _sopt_initState(STATE_FIREWORKS);
     }
 #endif
 #ifndef NO_CANDLE
@@ -838,8 +917,8 @@ void processCommand(Adafruit_CC3000_ClientRef client, char* buffer)
     {
         PRINT_CONTENT(F("Candle"));
         FIX_BRIGHTNESS();
-        settings.setState(STATE_FLICKER);
-        settings.setColor(0xBF3F00);
+        _sopt_setState(STATE_FLICKER);
+        _sopt_setColor(0xBF3F00);
         settings.setVariance(0x402800);
     }
 #endif
@@ -847,8 +926,8 @@ void processCommand(Adafruit_CC3000_ClientRef client, char* buffer)
     else if (strcmp(buffer, "sp") == 0)
     {
         PRINT_CONTENT(F("Spectrum"));
-        strip.setBrightness(255);
-        settings.initState(STATE_SPECTRUM);
+        strip.initBrightness(255);
+        _sopt_initState(STATE_SPECTRUM);
     }
 #endif
     else
@@ -857,54 +936,71 @@ void processCommand(Adafruit_CC3000_ClientRef client, char* buffer)
     {
         if (buffer[0] == 'c')
         {
-            PRINT_CONTENT(F("Color: "));
-            settings.initState(STATE_COLOR_CHANGE);
-            settings.setColor(hexStrToInt(++buffer));
+            PRINT_CONTENT(F("Color: #"));
+            _sopt_initState(STATE_COLOR_CHANGE);
+            uint32_t color = hexStrToInt(++buffer);
+            _sopt_setColor(color);
+            _sopt_clientPrintValue(color, HEX);
         }
         else if (buffer[0] == 'o')
         {
-            PRINT_CONTENT(F("O: "));
-            settings.setBaseOffset(atoi(++buffer));
+            PRINT_CONTENT(F("Offset: "));
+            int16_t offset = atoi(++buffer);
+            settings.setBaseOffset(offset);
+            _sopt_clientPrintValue(offset, DEC);
+
+            setStripColor(0, offset, 0);
+            _sopt_show();
         }
         else if (buffer[0] == 'p')
         {
-            PRINT_CONTENT(F("P: "));
-            settings.setPixelCount(atoi(++buffer));
+            PRINT_CONTENT(F("Pixels: "));
+            int16_t length = atoi(++buffer);
+            settings.setPixelCount(length);
+            _sopt_clientPrintValue(length, DEC);
+
+            setStripColor(length, NEOPIXEL_COUNT, 0);
+            _sopt_show();
         }
 #ifndef NO_FLICKER
         else if (buffer[0] == 'f')
         {
-            PRINT_CONTENT(F("F: "));
+            PRINT_CONTENT(F("Flicker: #"));
             FIX_BRIGHTNESS();
-            settings.setState(STATE_FLICKER);
-            settings.setVariance(hexStrToInt(++buffer));
+            _sopt_setState(STATE_FLICKER);
+            uint32_t variance = hexStrToInt(++buffer);
+            settings.setVariance(variance);
+            _sopt_clientPrintValue(variance, HEX);
         }
 #endif
 #ifndef NO_SPECTRUM
         else if (buffer[0] == 's')
         {
-            PRINT_CONTENT(F("S: "));
-            settings.setSensitivity(atoi(++buffer));
-            client.print(settings.getSensitivity(), DEC);
+            PRINT_CONTENT(F("Sensitivity: "));
+            uint8_t sensitivity = atoi(++buffer);
+            settings.setSensitivity(sensitivity);
+            _sopt_clientPrintValue(sensitivity, DEC);
         }
         else if (buffer[0] == 'n')
         {
-            PRINT_CONTENT(F("C: "));
-            settings.setCutoff(atoi(++buffer));
-            client.print(settings.getCutoff(), DEC);
+            PRINT_CONTENT(F("Cutoff: "));
+            uint8_t cutoff = atoi(++buffer);
+            settings.setCutoff(cutoff);
+            _sopt_clientPrintValue(cutoff, DEC);
         }
         else if (buffer[0] == 'r')
         {
-            PRINT_CONTENT(F("R: "));
-            settings.setFrequencyRolloff(atoi(++buffer));
-            client.print(settings.getFrequencyRolloff(), DEC);
+            PRINT_CONTENT(F("Rolloff: "));
+            uint8_t frequencyRolloff = atoi(++buffer);
+            settings.setFrequencyRolloff(frequencyRolloff);
+            _sopt_clientPrintValue(frequencyRolloff, DEC);
          }
 #endif
         else if (buffer[0] == 'b')
         {
             PRINT_CONTENT(F("Brightness: "));
             setBrightness(atoi(++buffer));
-            client.print(settings.getBrightness(), DEC);
+            _sopt_clientPrintValue(_sopt_getBrightness(), DEC);
         }
     }
 }
@@ -933,45 +1029,46 @@ void loop()
     // Reset the watchdog timer
     checkStatus();
 
-    uint8_t state = settings.getState();
+    uint8_t state = _sopt_getState();
 
     // Try to get a client which is connected.
     wdt_reset();
-    Adafruit_CC3000_ClientRef client = webServer.available();
-    if (client && client.available() > 0)
+    Adafruit_CC3000_ClientRef c = webServer.available();
+    client = &c;
+    if (client && client->available() > 0)
     {
         SERIAL_PRINTLN("R");
 
         char buffer[12];
-        readCommand(client, buffer);
+        readCommand(buffer);
 
         wdt_reset();
-        client.fastrprint((const __FlashStringHelper*)website_http_data);
+        _sopt_clientPrintString((const __FlashStringHelper*)website_http_data);
         PRINT_CONTENT((const __FlashStringHelper*)website_doctype_data);
-        client.fastrprint((const __FlashStringHelper*)website_header_data);
+        _sopt_clientPrintString((const __FlashStringHelper*)website_header_data);
 
 #if WEBSITE_TYPE != WEBSITE_NONE
         wdt_reset();
-        client.fastrprint((const __FlashStringHelper*)website_options_data);
-        client.print(settings.getBrightness(), DEC);
-        client.fastrprint((const __FlashStringHelper*)website_color_data);
-        client.print(settings.getColor(), HEX);
+        _sopt_clientPrintString((const __FlashStringHelper*)website_options_data);
+        _sopt_clientPrintValue(_sopt_getBrightness(), DEC);
+        _sopt_clientPrintString((const __FlashStringHelper*)website_color_data);
+        _sopt_clientPrintValue(_sopt_getColor(), HEX);
         wdt_reset();
-        client.fastrprint((const __FlashStringHelper*)website_version_data);
-        client.print(VERSION);
-        client.fastrprint((const __FlashStringHelper*)website_reboot_data);
-        client.print((int32_t)debugState.rebootCount, DEC);
+        _sopt_clientPrintString((const __FlashStringHelper*)website_version_data);
+        _sopt_clientPrint(VERSION);
+        _sopt_clientPrintString((const __FlashStringHelper*)website_reboot_data);
+        _sopt_clientPrintValue(debugState.rebootCount, DEC);
         wdt_reset();
-        client.fastrprint((const __FlashStringHelper*)website_disconnect_data);
-        client.print((int32_t)debugState.disconnectCount, DEC);
-        client.fastrprint((const __FlashStringHelper*)website_prevState_data);
-        client.print(debugState.prevDebugStage);
+        _sopt_clientPrintString((const __FlashStringHelper*)website_disconnect_data);
+        _sopt_clientPrintValue(debugState.disconnectCount, DEC);
+        _sopt_clientPrintString((const __FlashStringHelper*)website_prevState_data);
+        _sopt_clientPrint(debugState.prevDebugStage);
 #endif
 
         if ((buffer[0] != '\0') && (buffer[0] != ' '))
         {
             PRINT_CONTENT((const __FlashStringHelper*)website_command_data);
-            processCommand(client, buffer);
+            processCommand(buffer);
         }
 
         wdt_reset();
@@ -980,14 +1077,15 @@ void loop()
 #ifdef WEBSITE_HEADER_SEND_LENGTH
         for (uint8_t remaining_length = WEBSITE_VARIABLE_LENGTH - strlen(buffer) - 2; remaining_length > 0; remaining_length--)
         {
-            client.write('\0');
+            client->write('\0');
         }
 #endif
 
-        client.write('\0');
+        client->write('\0');
         delay(5);
         wdt_reset();
-        client.close();
+        client->close();
+        client = NULL;
     }
     else if (state != STATE_SPECTRUM)
     {
