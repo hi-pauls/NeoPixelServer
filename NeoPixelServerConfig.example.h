@@ -14,12 +14,13 @@
 #define NEOPIXEL_COUNT          16
 
 // NeoPixel config
-//#define NEOPIXEL_BRIGHTNESS     192
-//#define NEOPIXEL_MAX_BRIGHTNESS 255
-//#define NEOPIXEL_USB_BRIGHTNESS 8
-//#define NEOPIXEL_COLOR_DELAY    40
-//#define NEOPIXEL_RAINBOW_DELAY  20
-//#define NEOPIXEL_FLICKER_DELAY  100
+//#define NEOPIXEL_BRIGHTNESS      192
+//#define NEOPIXEL_MAX_BRIGHTNESS  255
+//#define NEOPIXEL_USB_BRIGHTNESS  8
+//#define NEOPIXEL_COLOR_DELAY     40
+//#define NEOPIXEL_RAINBOW_DELAY   20
+//#define NEOPIXEL_FLICKER_DELAY   100
+//#define NEOPIXEL_STROBE_DELAY    80
 
 // Spectrum config
 #define SPECTRUM_IN_PIN A5
@@ -46,4 +47,5 @@
 //#define NO_FIREWORKS
 //#define NO_RUN
 //#define NO_CYLON
+//#define NO_STROBE
 //#define NO_SPECTRUM

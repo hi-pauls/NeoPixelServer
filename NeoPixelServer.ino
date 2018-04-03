@@ -681,6 +681,23 @@ void flicker()
 }
 #endif
 
+#ifndef NO_STROBE
+void strobe()
+{
+    if (! _sopt_checkTime(NEOPIXEL_STROBE_DELAY))
+    {
+        return;
+    }
+
+    int16_t offset = _sopt_getBaseOffset();
+    int16_t count = _sopt_getPixelCount();
+    setStripColor(offset, count, _settings_getColor());
+    _sopt_show();
+    setStripColor(offset, count, 0);
+    _sopt_show();
+}
+#endif
+
 #ifndef NO_SPECTRUM
 void spectrum()
 {
@@ -922,6 +939,14 @@ void processCommand(char* buffer)
         settings.setVariance(0x402800);
     }
 #endif
+#ifndef NO_STROBE
+    else if (strcmp(buffer, "sr") == 0)
+    {
+        PRINT_CONTENT(F("Strobe"));
+        strip.initBrightness(255);
+        _sopt_initState(STATE_STROBE);
+    }
+#endif
 #ifndef NO_SPECTRUM
     else if (strcmp(buffer, "sp") == 0)
     {
@@ -1128,6 +1153,11 @@ void loop()
 #ifndef NO_FLICKER
         case STATE_FLICKER:
             flicker();
+            break;
+#endif
+#ifndef NO_STROBE
+        case STATE_STROBE:
+            strobe();
             break;
 #endif
 #ifndef NO_SPECTRUM

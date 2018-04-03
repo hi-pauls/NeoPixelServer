@@ -105,6 +105,7 @@ Brightness: ";
 <a href='fw'>Fireworks</a>\
 <a href='rn'>Run</a>\
 <a href='cy'>Cylon</a>\
+<a href='sr'>Strobe</a>\
 <a href='sp'>Spectrum</a>\
 <a href='st'>Stop</a>\
 <h3>Brightness</h3>\

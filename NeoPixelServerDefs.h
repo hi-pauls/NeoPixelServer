@@ -20,7 +20,8 @@
 #define STATE_CYLON         5
 #define STATE_FIREWORKS     6
 #define STATE_FLICKER       7
-#define STATE_SPECTRUM      8
+#define STATE_STROBE        8
+#define STATE_SPECTRUM      9
 
 // Settings verification data
 #define SETTINGS_MAGIC         "Nps"
@@ -87,6 +88,10 @@
     #define ERROR()  cylon()
 #endif
 
+#ifdef NO_STROBE
+    #pragma message ("No strobe")
+#endif
+
 #ifdef NO_SPECTRUM
     #pragma message ("No spectrum")
     #define FIX_BRIGHTNESS()
@@ -129,6 +134,10 @@
 
 #ifndef NEOPIXEL_FLICKER_DELAY
     #define NEOPIXEL_FLICKER_DELAY   100
+#endif
+
+#ifndef NEOPIXEL_STROBE_DELAY
+    #define NEOPIXEL_STROBE_DELAY    80
 #endif
 
 #if !defined(SPECTRUM_IN_PIN) && !defined(NO_SPECTRUM)
