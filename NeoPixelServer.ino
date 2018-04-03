@@ -171,6 +171,14 @@ NO_INIT_ON_RESET uint8_t pixels[NEOPIXEL_COUNT * 3];
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NEOPIXEL_COUNT, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800, pixels);
 Adafruit_CC3000 cc3000 = Adafruit_CC3000(CC3000_PIN_CS, CC3000_PIN_IRQ, CC3000_PIN_VBAT, SPI_CLOCK_DIV4);
 Adafruit_CC3000_Server webServer = Adafruit_CC3000_Server(WEBSERVER_PORT);
+void setPixelColor(int16_t index, uint32_t color)
+{
+    if (_sopt_getBaseOffset() <= index && index < _sopt_getPixelCount())
+    {
+        strip.setPixelColor(index, color);
+    }
+}
+
 
 #ifndef NO_SPECTRUM
 void setupMicrophone()
@@ -433,8 +441,8 @@ void colorWipe()
         return;
     }
 
-    strip.setPixelColor(settings.getOffset(), settings.getColor());
     strip.show();
+    setPixelColor(_sopt_getOffset(), _sopt_getColor());
 
     if (settings.updateOffset() > settings.getPixelCount())
     {
@@ -454,7 +462,7 @@ void rainbow()
     int16_t offset = settings.getOffset();
     for(uint8_t i = settings.getBaseOffset(); i < settings.getPixelCount(); i++)
     {
-        strip.setPixelColor(i, Wheel((i + offset) & 255));
+        setPixelColor(i, Wheel((i + offset) & 255));
     }
 
     strip.show();
@@ -474,7 +482,7 @@ void fadeColors()
     int16_t offset = settings.getOffset();
     for(uint8_t i = settings.getBaseOffset(); i < settings.getPixelCount(); i++)
     {
-        strip.setPixelColor(i, Wheel(((i * 256 / settings.getPixelCount()) + offset) & 255));
+        setPixelColor(i, Wheel(((i * 256 / _sopt_getPixelCount()) + offset) & 255));
     }
 
     strip.show();
@@ -516,12 +524,12 @@ void run()
     int16_t offset = settings.getOffset();
     int8_t direction = settings.getDirection();
 
-    strip.setPixelColor(offset, color);
-    strip.setPixelColor(offset - direction, (color >> 1) & 0x7F7F7F);
-    strip.setPixelColor(offset - (direction * 2), (color >> 2) & 0x3F3F3F);
-    strip.setPixelColor(offset - (direction * 3), (color >> 3) & 0x1F1F1F);
-    strip.setPixelColor(offset - (direction * 4), 0);
     strip.show();
+    setPixelColor(offset, color);
+    setPixelColor(offset - direction, (color >> 1) & 0x7F7F7F);
+    setPixelColor(offset - (direction * 2), (color >> 2) & 0x3F3F3F);
+    setPixelColor(offset - (direction * 3), (color >> 3) & 0x1F1F1F);
+    setPixelColor(offset - (direction * 4), 0);
 
     offset = settings.updateOffset();
     if ((offset < settings.getBaseOffset() - 4) || (offset > settings.getPixelCount() + 4))
@@ -587,7 +595,7 @@ void flicker()
         uint8_t r = ((color >> 16) & 0xFF) + random(-varr, varr);
         uint8_t g = ((color >> 8) & 0xFF) + random(-varg, varg);
         uint8_t b = (color & 0xFF) + random(-varb, varb);
-        strip.setPixelColor(i, strip.Color(r, g, b));
+        setPixelColor(i, strip.Color(r, g, b));
     }
 
     strip.show();
@@ -706,12 +714,12 @@ void spectrum()
     {
         for (uint8_t i = settings.getPixelCount() - 1; i > baseOffset; i--)
         {
-            strip.setPixelColor(i, strip.getPixelColor(i - 1));
+            setPixelColor(i, strip.getPixelColor(i - 1));
         }
     }
 
-    strip.setPixelColor(baseOffset, strip.Color(r, g, b));
     strip.show();
+    setPixelColor(baseOffset, strip.Color(r, g, b));
 }
 #endif
 
